@@ -1,0 +1,22 @@
+{
+  "name": "shared-server",
+  "workspaces": [
+    "packages/client",
+    "packages/server",
+    "packages/util"
+  ],
+  "scripts": {
+    "watch": "concurrently 'npm:watch-*'",
+    "watch-client": "cd packages/client && npm run watch",
+    "watch-server": "cd packages/server && npm run watch",
+    "watch-util": "cd packages/util && npm run watch",
+    "build": "concurrently 'npm:build-*'",
+    "build-client": "cd packages/client && npm run build",
+    "build-server": "cd packages/server && npm run build",
+    "build-util": "cd packages/util && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0",
+    "prettier": "^2.8.4"
+  }
+}
