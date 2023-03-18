@@ -8,10 +8,12 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
-    "generateKey": "node dist/generateKey.js"
+    "generateKey": "node dist/generateKey.js",
+    "deployCommands": "node dist/deployCommands.js"
   },
   "dependencies": {
     "@shared-server/util": "1.0.0",
+    "discord.js": "^14.8.0",
     "dotenv-flow": "^3.2.0",
     "fastify": "^4.14.1",
     "pg": "^8.10.0"

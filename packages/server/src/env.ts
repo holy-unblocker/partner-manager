@@ -5,6 +5,12 @@ import { env } from "node:process";
 config();
 
 /**
+ * Discord bot token
+ */
+export const DISCORD_TOKEN = process.env.DISCORD_TOKEN || "";
+if (!DISCORD_TOKEN) throw new TypeError("Need DISCORD_TOKEN var");
+
+/**
  * Port to listen on
  */
 export const PORT = Number(env.PORT || "8080");
