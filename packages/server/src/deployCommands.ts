@@ -31,3 +31,5 @@ const data = (await rest.put(
 )) as RESTPutAPIApplicationGuildCommandsResult;
 
 console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+
+process.exit();
