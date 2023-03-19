@@ -44,6 +44,68 @@ async function fetchOrgs(user: string) {
 
 registerCommand({
   data: new SlashCommandBuilder()
+    .setName("add-domain")
+    .addStringOption(
+      new SlashCommandStringOption()
+        .setName("id")
+        .setDescription("Short identifier for the organization")
+        .setRequired(true)
+    )
+    .addStringOption(
+      new SlashCommandStringOption()
+        .setName("domains")
+        .setDescription("Comma separated list of domains")
+        .setRequired(true)
+    )
+    .setDescription("Adds domains to your organization"),
+  async execute(interaction) {
+    const vid = interaction.options.getString("id", true);
+    const domains = interaction.options
+      .getString("domains", true)
+      .replace(/\s/, "")
+      .split(", ");
+
+    const {
+      rows: [idData],
+    } = await db.query<{ id: number }>(
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      [vid]
+    );
+
+    if (!idData)
+      return void (await interaction.reply({
+        content: "The organization with ID doesn't exist.",
+        ephemeral: true,
+      }));
+
+    const { id } = idData;
+
+    const { rowCount: isMember } = await db.query(
+      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
+      [interaction.user.id, id]
+    );
+
+    if (isMember !== 1)
+      return void (await interaction.reply({
+        content: "You aren't in this organization.",
+        ephemeral: true,
+      }));
+
+    for (const domain of domains)
+      await db.query(
+        "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
+        [domain, id]
+      );
+
+    await interaction.reply({
+      content: `Added ${domains.length} domains.`,
+      ephemeral: true,
+    });
+  },
+});
+
+registerCommand({
+  data: new SlashCommandBuilder()
     .setName("orgs")
     .setDescription("Lists your organizations"),
   async execute(interaction) {
@@ -131,9 +193,36 @@ registerCommand({
     )
     .setDescription("Deletes an organization"),
   async execute(interaction) {
+    const vid = interaction.options.getString("id", true);
+
+    const {
+      rows: [idData],
+    } = await db.query<{ id: number }>(
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      [vid]
+    );
+
+    if (!idData)
+      return void (await interaction.reply({
+        content: "The organization with ID doesn't exist.",
+        ephemeral: true,
+      }));
+
+    const { id } = idData;
+
+    const { rowCount: isOwner } = await db.query(
+      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
+      [interaction.user.id, id]
+    );
+
+    if (isOwner !== 1)
+      return void (await interaction.reply({
+        content: "You aren't the owner of this organization.",
+        ephemeral: true,
+      }));
+
     await interaction.reply({
-      content:
-        ":x: Only the organization owner (<@1058825174935404654>) can delete it.",
+      content: "TODO.",
       ephemeral: true,
     });
   },
@@ -170,11 +259,19 @@ registerCommand({
     // Then add a membership to the MEMBERSHIPS table
     // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
     const {
-      rows: [{ id }],
+      rows: [idData],
     } = await db.query<{ id: number }>(
       "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
       [vid]
     );
+
+    if (!idData)
+      return void (await interaction.reply({
+        content: "The organization with ID doesn't exist.",
+        ephemeral: true,
+      }));
+
+    const { id } = idData;
 
     const { rowCount: isOwner } = await db.query(
       "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
