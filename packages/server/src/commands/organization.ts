@@ -549,7 +549,6 @@ registerCommand({
   async execute(interaction) {
     const vid = interaction.options.getString("id", true);
     const user = interaction.options.getUser("user", true);
-    const owner = interaction.options.getBoolean("owner", true);
 
     // Locate an organization with the VID and get the ID
     // Then add a membership to the MEMBERSHIPS table
@@ -581,8 +580,8 @@ registerCommand({
       }));
 
     const { rowCount: promoted } = await db.query(
-      "DELETE FROM MEMBERSHIPS WHERE ID = $2 AND ORGANIZATION = $3 AND NOT OWNER;",
-      [owner, user.id, id]
+      "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
+      [user.id, id]
     );
 
     if (promoted !== 0)
@@ -594,6 +593,55 @@ registerCommand({
     await interaction.reply({
       ephemeral: true,
       content: `<@${user.id}> has been fired from organization.`,
+    });
+  },
+});
+
+registerCommand({
+  data: new SlashCommandBuilder()
+    .setName("quit")
+    .addStringOption(
+      new SlashCommandStringOption()
+        .setName("id")
+        .setDescription("Short identifier for the organization")
+        .setRequired(true)
+    )
+    .setDescription("Quits the organization"),
+  async execute(interaction) {
+    const vid = interaction.options.getString("id", true);
+
+    // Locate an organization with the VID and get the ID
+    // Then add a membership to the MEMBERSHIPS table
+    // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
+    const {
+      rows: [idData],
+    } = await db.query<{ id: number }>(
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      [vid]
+    );
+
+    if (!idData)
+      return void (await interaction.reply({
+        content: "The organization with ID doesn't exist.",
+        ephemeral: true,
+      }));
+
+    const { id } = idData;
+
+    const { rowCount: promoted } = await db.query(
+      "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
+      [interaction.user.id, id]
+    );
+
+    if (promoted !== 0)
+      return void (await interaction.reply({
+        content: "You're not in the organization.",
+        ephemeral: true,
+      }));
+
+    await interaction.reply({
+      ephemeral: true,
+      content: `You have quit the organization.`,
     });
   },
 });
