@@ -343,6 +343,33 @@ registerCommand({
       content: "TODO.",
       ephemeral: true,
     });
+
+    const { rowCount: memberRowCount } = await db.query<{ id: string }>(
+      `DELETE FROM MEMBERS WHERE ORGANIZATION = $1;`,
+      [id]
+    );
+
+    const { rowCount: domainRowCount } = await db.query<{ id: string }>(
+      `DELETE FROM DOMAINS WHERE ORGANIZATION = $1;`,
+      [id]
+    );
+
+    const { rowCount: orgRowCount } = await db.query<{ id: string }>(
+      `DELETE FROM ORGANIZATIONS WHERE ID = $1;`,
+      [id]
+    );
+
+    if (orgRowCount !== 1)
+      return void (await interaction.reply({
+        ephemeral: true,
+        content:
+          "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
+      }));
+
+    await interaction.reply({
+      ephemeral: true,
+      content: `Fired ${memberRowCount} members and deleted ${domainRowCount} domains.`,
+    });
   },
 });
 
