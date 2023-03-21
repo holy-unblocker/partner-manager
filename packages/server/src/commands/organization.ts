@@ -106,6 +106,68 @@ registerCommand({
 
 registerCommand({
   data: new SlashCommandBuilder()
+    .setName("delete-domain")
+    .addStringOption(
+      new SlashCommandStringOption()
+        .setName("id")
+        .setDescription("Short identifier for the organization")
+        .setRequired(true)
+    )
+    .addStringOption(
+      new SlashCommandStringOption()
+        .setName("domains")
+        .setDescription("Comma separated list of domains")
+        .setRequired(true)
+    )
+    .setDescription("Deletes domains from your organization"),
+  async execute(interaction) {
+    const vid = interaction.options.getString("id", true);
+    const domains = interaction.options
+      .getString("domains", true)
+      .replace(/\s/, "")
+      .split(", ");
+
+    const {
+      rows: [idData],
+    } = await db.query<{ id: number }>(
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      [vid]
+    );
+
+    if (!idData)
+      return void (await interaction.reply({
+        content: "The organization with ID doesn't exist.",
+        ephemeral: true,
+      }));
+
+    const { id } = idData;
+
+    const { rowCount: isMember } = await db.query(
+      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
+      [interaction.user.id, id]
+    );
+
+    if (isMember !== 1)
+      return void (await interaction.reply({
+        content: "You aren't in this organization.",
+        ephemeral: true,
+      }));
+
+    for (const domain of domains)
+      await db.query(
+        "DELETE FROM DOMAINS WHERE ORGANIZATION = $1 AND DOMAIN = $2;",
+        [id, domain]
+      );
+
+    await interaction.reply({
+      content: `Deleted ${domains.length} domains.`,
+      ephemeral: true,
+    });
+  },
+});
+
+registerCommand({
+  data: new SlashCommandBuilder()
     .setName("orgs")
     .setDescription("Lists your organizations"),
   async execute(interaction) {
@@ -173,11 +235,16 @@ registerCommand({
       [interaction.user.id, id, true]
     );
 
-    if (rowCount !== 1) throw new RangeError("Couldn't add member");
+    if (rowCount !== 1)
+      return void (await interaction.reply({
+        ephemeral: true,
+        content:
+          "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
+      }));
 
     await interaction.reply({
       ephemeral: true,
-      content: "User has been added to organization ABC",
+      content: "User has been added to organization.",
     });
   },
 });
