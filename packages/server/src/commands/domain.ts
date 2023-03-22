@@ -121,6 +121,7 @@ registerCommand(
         });
       },
     },
+
     {
       data: new SlashCommandSubcommandBuilder()
         .setName("list")
@@ -132,7 +133,19 @@ registerCommand(
             .setRequired(true)
         ),
       execute: async (interaction) => {
-        await interaction.reply("TODO");
+        const id = await getCommandID(interaction);
+        if (!id) return;
+
+        await interaction.reply(
+          (
+            await db.query<{ domain: string }>(
+              "SELECT DOMAIN FROM DOMAINS WHERE ORGANIZATION = $1;",
+              [id]
+            )
+          ).rows
+            .map((m) => m.domain)
+            .join("\n")
+        );
       },
     }
   )
