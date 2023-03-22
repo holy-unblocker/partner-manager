@@ -8,8 +8,8 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
-    "generateKey": "node dist/generateKey.js",
-    "deployCommands": "node dist/deployCommands.js"
+    "key": "node dist/generateKey.js",
+    "deploy": "node dist/deployCommands.js"
   },
   "dependencies": {
     "@shared-server/util": "1.0.0",
