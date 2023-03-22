@@ -36,7 +36,7 @@ export async function fetchOrgs(user: string) {
 }
 
 export async function getCommandID(interaction: ChatInputCommandInteraction) {
-  const vid = interaction.options.getString("id", true).toLowerCase().trim();
+  const vid = interaction.options.getString("id", true).trim().toLowerCase();
 
   const {
     rows: [idData],

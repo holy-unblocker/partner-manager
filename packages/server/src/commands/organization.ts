@@ -57,7 +57,10 @@ registerCommand(
         )
         .setDescription("Creates an organization"),
       execute: async (interaction) => {
-        const vid = interaction.options.getString("id", true).toLowerCase();
+        const vid = interaction.options
+          .getString("id", true)
+          .trim()
+          .toLowerCase();
         const name = interaction.options.getString("name", true);
 
         const { rowCount: existingOrgs } = await db.query<{ id: string }>(
