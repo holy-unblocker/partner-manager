@@ -68,7 +68,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
@@ -130,7 +130,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
@@ -182,7 +182,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
@@ -264,7 +264,7 @@ registerCommand({
     const name = interaction.options.getString("name", true);
 
     const { rowCount: existingOrgs } = await db.query<{ id: string }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
@@ -316,7 +316,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
@@ -406,7 +406,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
@@ -487,7 +487,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
@@ -556,7 +556,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
       [vid]
     );
 
@@ -616,7 +616,7 @@ registerCommand({
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
       [vid]
     );
 
