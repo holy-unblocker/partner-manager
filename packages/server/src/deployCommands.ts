@@ -26,7 +26,7 @@ const user = (await rest.get(Routes.user("@me"))) as RawUserData;
 const data = (await rest.put(
   Routes.applicationGuildCommands(user.id, guildID),
   {
-    body: commands.map((cmd) => cmd.data.toJSON()),
+    body: [...commands.entries()].map(([, cmd]) => cmd.data.toJSON()),
   }
 )) as RESTPutAPIApplicationGuildCommandsResult;
 

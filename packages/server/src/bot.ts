@@ -20,7 +20,7 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   try {
-    await command.execute(interaction);
+    await command.handle(interaction);
   } catch (err) {
     console.error(err);
     if (interaction.replied || interaction.deferred) {

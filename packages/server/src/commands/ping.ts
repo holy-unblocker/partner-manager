@@ -1,11 +1,13 @@
-import { registerCommand } from "../commands.js";
+import { CommandOptionsOnly, registerCommand } from "../commands.js";
 import { SlashCommandBuilder } from "discord.js";
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("ping")
-    .setDescription("Replies with Pong!"),
-  async execute(interaction) {
-    await interaction.reply("Pong!");
-  },
-});
+registerCommand(
+  new CommandOptionsOnly(
+    new SlashCommandBuilder()
+      .setName("ping")
+      .setDescription("Replies with Pong!"),
+    async (interaction) => {
+      await interaction.reply("Pong!");
+    }
+  )
+);

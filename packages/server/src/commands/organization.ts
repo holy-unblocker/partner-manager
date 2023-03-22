@@ -1,53 +1,27 @@
-import { registerCommand } from "../commands.js";
+import {
+  commandIsMember,
+  commandIsOwner,
+  getCommandID,
+  fetchOrgs,
+} from "../commandUtil.js";
+import { CommandSubOnly, registerCommand } from "../commands.js";
 import db from "../db.js";
 import {
   SlashCommandBuilder,
   SlashCommandStringOption,
-  SlashCommandUserOption,
-  SlashCommandBooleanOption,
   EmbedBuilder,
+  SlashCommandSubcommandBuilder,
+  SlashCommandBooleanOption,
+  SlashCommandUserOption,
 } from "discord.js";
 
-async function fetchOrgs(user: string) {
-  const { rows: orgs } = await db.query<{
-    id: number;
-    vid: string;
-    name: string;
-    enabled: boolean;
-  }>(
-    "SELECT o.NAME, o.ID, o.VID, o.ENABLED FROM ORGANIZATIONS o JOIN MEMBERSHIPS m ON o.ID = m.ORGANIZATION WHERE m.ID = $1;",
-    [user]
-  );
-
-  const res: {
-    id: number;
-    vid: string;
-    name: string;
-    enabled: boolean;
-    members: { id: string; owner: boolean }[];
-  }[] = [];
-
-  for (const org of orgs) {
-    const { rows: members } = await db.query<{
-      id: string;
-      owner: boolean;
-    }>("SELECT ID, OWNER FROM MEMBERSHIPS WHERE ORGANIZATION = $1;", [org.id]);
-
-    res.push({
-      ...org,
-      members,
-    });
-  }
-
-  return res;
-}
-
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("domain")
-    .setDescription("Domain management")
-    .addSubcommand((command) =>
-      command
+registerCommand(
+  new CommandSubOnly(
+    new SlashCommandBuilder()
+      .setName("domain")
+      .setDescription("Domain management"),
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("add")
         .addStringOption(
           new SlashCommandStringOption()
@@ -61,10 +35,32 @@ registerCommand({
             .setDescription("Comma separated list of domains")
             .setRequired(true)
         )
-        .setDescription("Adds domains to your organization")
-    )
-    .addSubcommand((command) =>
-      command
+        .setDescription("Adds domains to your organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
+
+        const domains = interaction.options
+          .getString("domains", true)
+          .replace(/\s/, "")
+          .split(", ");
+
+        if (!(await commandIsMember(interaction, id))) return;
+
+        for (const domain of domains)
+          await db.query(
+            "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
+            [domain, id]
+          );
+
+        await interaction.reply({
+          content: `Added ${domains.length} domains.`,
+          ephemeral: true,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("delete")
         .addStringOption(
           new SlashCommandStringOption()
@@ -78,10 +74,32 @@ registerCommand({
             .setDescription("Comma separated list of domains")
             .setRequired(true)
         )
-        .setDescription("Deletes domains from your organization")
-    )
-    .addSubcommand((command) =>
-      command
+        .setDescription("Deletes domains from your organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
+
+        const domains = interaction.options
+          .getString("domains", true)
+          .replace(/\s/, "")
+          .split(", ");
+
+        if (!(await commandIsMember(interaction, id))) return;
+
+        for (const domain of domains)
+          await db.query(
+            "DELETE FROM DOMAINS WHERE ORGANIZATION = $1 AND DOMAIN = $2;",
+            [id, domain]
+          );
+
+        await interaction.reply({
+          content: `Deleted ${domains.length} domains.`,
+          ephemeral: true,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("clear")
         .addStringOption(
           new SlashCommandStringOption()
@@ -89,124 +107,73 @@ registerCommand({
             .setDescription("Short identifier for the organization")
             .setRequired(true)
         )
-        .setDescription("Deletes all the domains your organization")
-    ),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
+        .setDescription("Deletes all the domains your organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
 
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
-      [vid]
-    );
+        if (!(await commandIsOwner(interaction, id))) return;
 
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
+        const { rowCount } = await db.query(
+          "DELETE FROM DOMAINS WHERE ORGANIZATION = $1;",
+          [id]
+        );
 
-    const { id } = idData;
-
-    switch (interaction.options.getSubcommand(true)) {
-      case "add":
-        {
-          const domains = interaction.options
-            .getString("domains", true)
-            .replace(/\s/, "")
-            .split(", ");
-
-          const { rowCount: isMember } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
-            [interaction.user.id, id]
-          );
-
-          if (isMember !== 1)
-            return void (await interaction.reply({
-              content: "You aren't in this organization.",
-              ephemeral: true,
-            }));
-
-          for (const domain of domains)
-            await db.query(
-              "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
-              [domain, id]
-            );
-
-          await interaction.reply({
-            content: `Added ${domains.length} domains.`,
-            ephemeral: true,
-          });
-        }
-        break;
-      case "delete":
-        {
-          const domains = interaction.options
-            .getString("domains", true)
-            .replace(/\s/, "")
-            .split(", ");
-
-          const { rowCount: isMember } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
-            [interaction.user.id, id]
-          );
-
-          if (isMember !== 1)
-            return void (await interaction.reply({
-              content: "You aren't in this organization.",
-              ephemeral: true,
-            }));
-
-          for (const domain of domains)
-            await db.query(
-              "DELETE FROM DOMAINS WHERE ORGANIZATION = $1 AND DOMAIN = $2;",
-              [id, domain]
-            );
-
-          await interaction.reply({
-            content: `Deleted ${domains.length} domains.`,
-            ephemeral: true,
-          });
-        }
-        break;
-      case "clear":
-        {
-          const { rowCount: isOwner } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-            [interaction.user.id, id]
-          );
-
-          if (isOwner !== 1)
-            return void (await interaction.reply({
-              content: "You aren't the owner of this organization.",
-              ephemeral: true,
-            }));
-
-          const { rowCount } = await db.query(
-            "DELETE FROM DOMAINS WHERE ORGANIZATION = $1;",
-            [id]
-          );
-
-          await interaction.reply({
-            content: `Deleted ${rowCount} domains.`,
-            ephemeral: true,
-          });
-        }
-        break;
+        await interaction.reply({
+          content: `Deleted ${rowCount} domains.`,
+          ephemeral: true,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
+        .setName("list")
+        .setDescription("Lists the domains in the organization")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        ),
+      execute: async (interaction) => {
+        await interaction.reply("TODO");
+      },
     }
-  },
-});
+  )
+);
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("org")
-    .setDescription("Manage your organizations")
-    .addSubcommand((command) =>
-      command.setName("list").setDescription("List the organizations you're in")
-    )
-    .addSubcommand((command) =>
-      command
+registerCommand(
+  new CommandSubOnly(
+    new SlashCommandBuilder()
+      .setName("org")
+      .setDescription("Manage your organizations"),
+    {
+      data: new SlashCommandSubcommandBuilder()
+        .setName("list")
+        .setDescription("List the organizations you're in"),
+      execute: async (interaction) => {
+        const orgs = await fetchOrgs(interaction.user.id);
+
+        await interaction.reply({
+          embeds: [
+            new EmbedBuilder().setTitle("Organizations").addFields(
+              orgs.map((o) => ({
+                name: o.name,
+                value: `Enabled: ${o.enabled}\nOwner: ${o.members
+                  .filter((m) => m.owner)
+                  .map((m) => `<@${m.id}>`)
+                  .join(" ")}\nMembers:\n${o.members
+                  .map((m) => `<@${m.id}>`)
+                  .join("\n")}`,
+              }))
+            ),
+          ],
+          ephemeral: true,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("new")
         .addStringOption(
           new SlashCommandStringOption()
@@ -220,10 +187,49 @@ registerCommand({
             .setDescription("Description of the organization")
             .setRequired(true)
         )
-        .setDescription("Creates an organization")
-    )
-    .addSubcommand((command) =>
-      command
+        .setDescription("Creates an organization"),
+      execute: async (interaction) => {
+        const vid = interaction.options.getString("id", true).toLowerCase();
+        const name = interaction.options.getString("name", true);
+
+        const { rowCount: existingOrgs } = await db.query<{ id: string }>(
+          "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+          [vid]
+        );
+
+        if (existingOrgs !== 0)
+          return void (await interaction.reply({
+            content: "Organization with ID already exists",
+            ephemeral: true,
+          }));
+
+        const {
+          rows: [{ id }],
+        } = await db.query<{ id: string }>(
+          `INSERT INTO ORGANIZATIONS (VID, NAME) VALUES ($1, $2) RETURNING ID;`,
+          [vid, name]
+        );
+
+        const { rowCount } = await db.query<{ id: string }>(
+          `INSERT INTO MEMBERSHIPS (ID, ORGANIZATION, OWNER) VALUES ($1, $2, $3);`,
+          [interaction.user.id, id, true]
+        );
+
+        if (rowCount !== 1)
+          return void (await interaction.reply({
+            ephemeral: true,
+            content:
+              "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
+          }));
+
+        await interaction.reply({
+          ephemeral: true,
+          content: "User has been added to organization.",
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("delete")
         .addStringOption(
           new SlashCommandStringOption()
@@ -231,10 +237,21 @@ registerCommand({
             .setDescription("Short identifier for the organization")
             .setRequired(true)
         )
-        .setDescription("Deletes an organization")
-    )
-    .addSubcommand((command) =>
-      command
+        .setDescription("Deletes an organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
+
+        if (!(await commandIsOwner(interaction, id))) return;
+
+        await interaction.reply({
+          content: "TODO.",
+          ephemeral: true,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("add")
         .addStringOption(
           new SlashCommandStringOption()
@@ -254,10 +271,59 @@ registerCommand({
             .setDescription("Whether the user should be notified")
             .setRequired(false)
         )
-        .setDescription("Invites a user to an organization")
-    )
-    .addSubcommand((command) =>
-      command
+        .setDescription("Invites a user to an organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
+        const user = interaction.options.getUser("user", true);
+        const notify = interaction.options.getBoolean("notify", false) || false;
+
+        if (!(await commandIsOwner(interaction, id))) return;
+
+        const { rowCount: inOrg } = await db.query(
+          "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
+          [user.id, id]
+        );
+
+        if (inOrg !== 0)
+          return void (await interaction.reply({
+            content: "User is already in organization.",
+            ephemeral: true,
+          }));
+
+        const { rowCount } = await db.query<{ id: string }>(
+          "INSERT INTO MEMBERSHIPS (ID, ORGANIZATION) VALUES($1, $2);",
+          [user.id, id]
+        );
+
+        if (rowCount !== 1) throw new RangeError("Couldn't add member");
+
+        let failureDMing = false;
+
+        if (notify)
+          try {
+            const dm = await user.createDM();
+            await dm.send(
+              `You've been added to the organiation ${id} by <@${interaction.user.id}>`
+            );
+          } catch {
+            failureDMing = true;
+          }
+
+        await interaction.reply({
+          ephemeral: true,
+          content: `<@${user.id}> has been added to organization ${id}.${
+            notify
+              ? failureDMing
+                ? " However, I was unable to DM them."
+                : " They have been notified."
+              : ""
+          }`,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("update")
         .addStringOption(
           new SlashCommandStringOption()
@@ -283,10 +349,57 @@ registerCommand({
             .setDescription("Whether the user should be notified")
             .setRequired(false)
         )
-        .setDescription("Promotes/demotes a user in the organization")
-    )
-    .addSubcommand((command) =>
-      command
+        .setDescription("Promotes/demotes a user in the organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
+        const user = interaction.options.getUser("user", true);
+        const owner = interaction.options.getBoolean("owner", true);
+        const notify = interaction.options.getBoolean("notify", false) || false;
+
+        if (!(await commandIsOwner(interaction, id))) return;
+
+        const { rowCount: promoted } = await db.query(
+          "UPDATE MEMBERSHIPS SET OWNER = $1 WHERE ID = $2 AND ORGANIZATION = $3;",
+          [owner, user.id, id]
+        );
+
+        if (promoted !== 0)
+          return void (await interaction.reply({
+            content: "User not found/already set to status.",
+            ephemeral: true,
+          }));
+
+        let failureDMing = false;
+
+        if (notify)
+          try {
+            const dm = await user.createDM();
+            await dm.send(
+              `You've been set to ${
+                owner ? "owner" : "member"
+              } in the organiation ${id} by <@${interaction.user.id}>`
+            );
+          } catch {
+            failureDMing = true;
+          }
+
+        await interaction.reply({
+          ephemeral: true,
+          content: `<@${user.id}> has been set to ${
+            owner ? "owner" : "member"
+          } of organization.${
+            notify
+              ? failureDMing
+                ? " However, I was unable to DM them."
+                : " They have been notified."
+              : ""
+          }`,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
         .setName("fire")
         .addStringOption(
           new SlashCommandStringOption()
@@ -306,339 +419,17 @@ registerCommand({
             .setDescription("Whether the user should be notified")
             .setRequired(false)
         )
-        .setDescription("Fires a user from the organization")
-    )
-    .addSubcommand((command) =>
-      command
-        .setName("leave")
-        .addStringOption(
-          new SlashCommandStringOption()
-            .setName("id")
-            .setDescription("Short identifier for the organization")
-            .setRequired(true)
-        )
-        .setDescription("Leave the organization")
-    ),
-  async execute(interaction) {
-    switch (interaction.options.getSubcommand(true)) {
-      case "list":
-        {
-          const orgs = await fetchOrgs(interaction.user.id);
+        .setDescription("Fires a user from the organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
+        const user = interaction.options.getUser("user", true);
+        const notify = interaction.options.getBoolean("notify", false) || false;
 
-          await interaction.reply({
-            embeds: [
-              new EmbedBuilder().setTitle("Organizations").addFields(
-                orgs.map((o) => ({
-                  name: o.name,
-                  value: `Enabled: ${o.enabled}\nOwner: ${o.members
-                    .filter((m) => m.owner)
-                    .map((m) => `<@${m.id}>`)
-                    .join(" ")}\nMembers:\n${o.members
-                    .map((m) => `<@${m.id}>`)
-                    .join("\n")}`,
-                }))
-              ),
-            ],
-            ephemeral: true,
-          });
-        }
-        break;
-      case "new":
-        {
-          const vid = interaction.options.getString("id", true).toLowerCase();
-          const name = interaction.options.getString("name", true);
+        if (!(await commandIsOwner(interaction, id))) return;
 
-          const { rowCount: existingOrgs } = await db.query<{ id: string }>(
-            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-            [vid]
-          );
-
-          if (existingOrgs !== 0)
-            return void (await interaction.reply({
-              content: "Organization with ID already exists",
-              ephemeral: true,
-            }));
-
-          const {
-            rows: [{ id }],
-          } = await db.query<{ id: string }>(
-            `INSERT INTO ORGANIZATIONS (VID, NAME) VALUES ($1, $2) RETURNING ID;`,
-            [vid, name]
-          );
-
-          const { rowCount } = await db.query<{ id: string }>(
-            `INSERT INTO MEMBERSHIPS (ID, ORGANIZATION, OWNER) VALUES ($1, $2, $3);`,
-            [interaction.user.id, id, true]
-          );
-
-          if (rowCount !== 1)
-            return void (await interaction.reply({
-              ephemeral: true,
-              content:
-                "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
-            }));
-
-          await interaction.reply({
-            ephemeral: true,
-            content: "User has been added to organization.",
-          });
-        }
-        break;
-      case "delete":
-        {
-          const vid = interaction.options.getString("id", true);
-
-          const {
-            rows: [idData],
-          } = await db.query<{ id: number }>(
-            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-            [vid]
-          );
-
-          if (!idData)
-            return void (await interaction.reply({
-              content: "The organization with ID doesn't exist.",
-              ephemeral: true,
-            }));
-
-          const { id } = idData;
-
-          const { rowCount: isOwner } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-            [interaction.user.id, id]
-          );
-
-          if (isOwner !== 1)
-            return void (await interaction.reply({
-              content: "You aren't the owner of this organization.",
-              ephemeral: true,
-            }));
-
-          await interaction.reply({
-            content: "TODO.",
-            ephemeral: true,
-          });
-
-          const { rowCount: memberRowCount } = await db.query<{ id: string }>(
-            `DELETE FROM MEMBERS WHERE ORGANIZATION = $1;`,
-            [id]
-          );
-
-          const { rowCount: domainRowCount } = await db.query<{ id: string }>(
-            `DELETE FROM DOMAINS WHERE ORGANIZATION = $1;`,
-            [id]
-          );
-
-          const { rowCount: orgRowCount } = await db.query<{ id: string }>(
-            `DELETE FROM ORGANIZATIONS WHERE ID = $1;`,
-            [id]
-          );
-
-          if (orgRowCount !== 1)
-            return void (await interaction.reply({
-              ephemeral: true,
-              content:
-                "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
-            }));
-
-          await interaction.reply({
-            ephemeral: true,
-            content: `Fired ${memberRowCount} members and deleted ${domainRowCount} domains.`,
-          });
-        }
-        break;
-      case "add":
-        {
-          const vid = interaction.options.getString("id", true);
-          const user = interaction.options.getUser("user", true);
-          const notify =
-            interaction.options.getBoolean("notify", false) || false;
-
-          // Locate an organization with the VID and get the ID
-          // Then add a membership to the MEMBERSHIPS table
-          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-          const {
-            rows: [idData],
-          } = await db.query<{ id: number }>(
-            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-            [vid]
-          );
-
-          if (!idData)
-            return void (await interaction.reply({
-              content: "The organization with ID doesn't exist.",
-              ephemeral: true,
-            }));
-
-          const { id } = idData;
-
-          const { rowCount: isOwner } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-            [interaction.user.id, id]
-          );
-
-          if (isOwner !== 1)
-            return void (await interaction.reply({
-              content: "You aren't the owner of this organization.",
-              ephemeral: true,
-            }));
-
-          const { rowCount: inOrg } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
-            [user.id, id]
-          );
-
-          if (inOrg !== 0)
-            return void (await interaction.reply({
-              content: "User is already in organization.",
-              ephemeral: true,
-            }));
-
-          const { rowCount } = await db.query<{ id: string }>(
-            "INSERT INTO MEMBERSHIPS (ID, ORGANIZATION) VALUES($1, $2);",
-            [user.id, id]
-          );
-
-          if (rowCount !== 1) throw new RangeError("Couldn't add member");
-
-          let failureDMing = false;
-
-          if (notify)
-            try {
-              const dm = await user.createDM();
-              await dm.send(
-                `You've been added to the organiation ${vid} by <@${interaction.user.id}>`
-              );
-            } catch {
-              failureDMing = true;
-            }
-
-          await interaction.reply({
-            ephemeral: true,
-            content: `<@${user.id}> has been added to organization ${vid}.${
-              notify
-                ? failureDMing
-                  ? " However, I was unable to DM them."
-                  : " They have been notified."
-                : ""
-            }`,
-          });
-        }
-        break;
-      case "update":
-        {
-          const vid = interaction.options.getString("id", true);
-          const user = interaction.options.getUser("user", true);
-          const owner = interaction.options.getBoolean("owner", true);
-          const notify =
-            interaction.options.getBoolean("notify", false) || false;
-
-          // Locate an organization with the VID and get the ID
-          // Then add a membership to the MEMBERSHIPS table
-          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-          const {
-            rows: [idData],
-          } = await db.query<{ id: number }>(
-            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-            [vid]
-          );
-
-          if (!idData)
-            return void (await interaction.reply({
-              content: "The organization with ID doesn't exist.",
-              ephemeral: true,
-            }));
-
-          const { id } = idData;
-
-          const { rowCount: isOwner } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-            [interaction.user.id, id]
-          );
-
-          if (isOwner !== 1)
-            return void (await interaction.reply({
-              content: "You aren't the owner of this organization.",
-              ephemeral: true,
-            }));
-
-          const { rowCount: promoted } = await db.query(
-            "UPDATE MEMBERSHIPS SET OWNER = $1 WHERE ID = $2 AND ORGANIZATION = $3;",
-            [owner, user.id, id]
-          );
-
-          if (promoted !== 0)
-            return void (await interaction.reply({
-              content: "User not found/already set to status.",
-              ephemeral: true,
-            }));
-
-          let failureDMing = false;
-
-          if (notify)
-            try {
-              const dm = await user.createDM();
-              await dm.send(
-                `You've been set to ${
-                  owner ? "owner" : "member"
-                } in the organiation ${vid} by <@${interaction.user.id}>`
-              );
-            } catch {
-              failureDMing = true;
-            }
-
-          await interaction.reply({
-            ephemeral: true,
-            content: `<@${user.id}> has been set to ${
-              owner ? "owner" : "member"
-            } of organization.${
-              notify
-                ? failureDMing
-                  ? " However, I was unable to DM them."
-                  : " They have been notified."
-                : ""
-            }`,
-          });
-        }
-        break;
-      case "fire":
-        {
-          const vid = interaction.options.getString("id", true);
-          const user = interaction.options.getUser("user", true);
-          const notify =
-            interaction.options.getBoolean("notify", false) || false;
-
-          // Locate an organization with the VID and get the ID
-          // Then add a membership to the MEMBERSHIPS table
-          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-          const {
-            rows: [idData],
-          } = await db.query<{ id: number }>(
-            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
-            [vid]
-          );
-
-          if (!idData)
-            return void (await interaction.reply({
-              content: "The organization with ID doesn't exist.",
-              ephemeral: true,
-            }));
-
-          const { id } = idData;
-
-          const { rowCount: isOwner } = await db.query(
-            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-            [interaction.user.id, id]
-          );
-
-          if (isOwner !== 1)
-            return void (await interaction.reply({
-              content: "You aren't the owner of this organization.",
-              ephemeral: true,
-            }));
-
-          // allow organization takeovers:
-          /*const { rowCount: fireIsOwner } = await db.query(
+        // allow organization takeovers:
+        /*const { rowCount: fireIsOwner } = await db.query(
             "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
             [user.id, id]
           );
@@ -649,69 +440,60 @@ registerCommand({
               ephemeral: true,
             }));*/
 
-          let failureDMing = false;
+        let failureDMing = false;
 
-          if (notify)
-            try {
-              const dm = await user.createDM();
-              await dm.send(
-                `You've been fired from ${vid} by <@${interaction.user.id}>`
-              );
-            } catch {
-              failureDMing = true;
-            }
+        if (notify)
+          try {
+            const dm = await user.createDM();
+            await dm.send(
+              `You've been fired from ${id} by <@${interaction.user.id}>`
+            );
+          } catch {
+            failureDMing = true;
+          }
 
-          await interaction.reply({
+        await interaction.reply({
+          ephemeral: true,
+          content: `<@${user.id}> has been fired from organization.${
+            notify
+              ? failureDMing
+                ? " However, I was unable to DM them."
+                : " They have been notified."
+              : ""
+          }`,
+        });
+      },
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
+        .setName("leave")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .setDescription("Leave the organization"),
+      execute: async (interaction) => {
+        const id = await getCommandID(interaction);
+        if (!id) return;
+
+        const { rowCount: promoted } = await db.query(
+          "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
+          [interaction.user.id, id]
+        );
+
+        if (promoted !== 0)
+          return void (await interaction.reply({
+            content: "You're not in the organization.",
             ephemeral: true,
-            content: `<@${user.id}> has been fired from organization.${
-              notify
-                ? failureDMing
-                  ? " However, I was unable to DM them."
-                  : " They have been notified."
-                : ""
-            }`,
-          });
-        }
-        break;
-      case "leave":
-        {
-          const vid = interaction.options.getString("id", true);
+          }));
 
-          // Locate an organization with the VID and get the ID
-          // Then add a membership to the MEMBERSHIPS table
-          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-          const {
-            rows: [idData],
-          } = await db.query<{ id: number }>(
-            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-            [vid]
-          );
-
-          if (!idData)
-            return void (await interaction.reply({
-              content: "The organization with ID doesn't exist.",
-              ephemeral: true,
-            }));
-
-          const { id } = idData;
-
-          const { rowCount: promoted } = await db.query(
-            "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
-            [interaction.user.id, id]
-          );
-
-          if (promoted !== 0)
-            return void (await interaction.reply({
-              content: "You're not in the organization.",
-              ephemeral: true,
-            }));
-
-          await interaction.reply({
-            ephemeral: true,
-            content: `You have quit the organization.`,
-          });
-        }
-        break;
+        await interaction.reply({
+          ephemeral: true,
+          content: `You have quit the organization.`,
+        });
+      },
     }
-  },
-});
+  )
+);
