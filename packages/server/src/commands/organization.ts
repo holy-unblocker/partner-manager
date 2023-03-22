@@ -95,7 +95,7 @@ registerCommand(
 
         await interaction.reply({
           ephemeral: true,
-          content: "User has been added to organization.",
+          content: "Organization created.",
         });
       },
     },
