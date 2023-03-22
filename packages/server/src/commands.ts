@@ -1,11 +1,16 @@
 import type {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
+  SlashCommandOptionsOnlyBuilder,
+  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Collection } from "discord.js";
 
 interface Command {
-  data: SlashCommandBuilder;
+  data:
+    | SlashCommandBuilder
+    | SlashCommandSubcommandsOnlyBuilder
+    | SlashCommandOptionsOnlyBuilder;
   execute: (interaction: ChatInputCommandInteraction) => Promise<void> | void;
 }
 

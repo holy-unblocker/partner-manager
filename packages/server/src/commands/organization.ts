@@ -44,31 +44,60 @@ async function fetchOrgs(user: string) {
 
 registerCommand({
   data: new SlashCommandBuilder()
-    .setName("add-domain")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
+    .setName("domain")
+    .setDescription("Domain management")
+    .addSubcommand((command) =>
+      command
+        .setName("add")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("domains")
+            .setDescription("Comma separated list of domains")
+            .setRequired(true)
+        )
+        .setDescription("Adds domains to your organization")
     )
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("domains")
-        .setDescription("Comma separated list of domains")
-        .setRequired(true)
+    .addSubcommand((command) =>
+      command
+        .setName("delete")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("domains")
+            .setDescription("Comma separated list of domains")
+            .setRequired(true)
+        )
+        .setDescription("Deletes domains from your organization")
     )
-    .setDescription("Adds domains to your organization"),
+    .addSubcommand((command) =>
+      command
+        .setName("clear")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .setDescription("Deletes all the domains your organization")
+    ),
   async execute(interaction) {
     const vid = interaction.options.getString("id", true);
-    const domains = interaction.options
-      .getString("domains", true)
-      .replace(/\s/, "")
-      .split(", ");
 
     const {
       rows: [idData],
     } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
       [vid]
     );
 
@@ -80,140 +109,92 @@ registerCommand({
 
     const { id } = idData;
 
-    const { rowCount: isMember } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
-      [interaction.user.id, id]
-    );
+    switch (interaction.options.getSubcommand(true)) {
+      case "add":
+        {
+          const domains = interaction.options
+            .getString("domains", true)
+            .replace(/\s/, "")
+            .split(", ");
 
-    if (isMember !== 1)
-      return void (await interaction.reply({
-        content: "You aren't in this organization.",
-        ephemeral: true,
-      }));
+          const { rowCount: isMember } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
+            [interaction.user.id, id]
+          );
 
-    for (const domain of domains)
-      await db.query(
-        "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
-        [domain, id]
-      );
+          if (isMember !== 1)
+            return void (await interaction.reply({
+              content: "You aren't in this organization.",
+              ephemeral: true,
+            }));
 
-    await interaction.reply({
-      content: `Added ${domains.length} domains.`,
-      ephemeral: true,
-    });
-  },
-});
+          for (const domain of domains)
+            await db.query(
+              "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
+              [domain, id]
+            );
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("delete-domain")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("domains")
-        .setDescription("Comma separated list of domains")
-        .setRequired(true)
-    )
-    .setDescription("Deletes domains from your organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
-    const domains = interaction.options
-      .getString("domains", true)
-      .replace(/\s/, "")
-      .split(", ");
+          await interaction.reply({
+            content: `Added ${domains.length} domains.`,
+            ephemeral: true,
+          });
+        }
+        break;
+      case "delete":
+        {
+          const domains = interaction.options
+            .getString("domains", true)
+            .replace(/\s/, "")
+            .split(", ");
 
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-      [vid]
-    );
+          const { rowCount: isMember } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
+            [interaction.user.id, id]
+          );
 
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
+          if (isMember !== 1)
+            return void (await interaction.reply({
+              content: "You aren't in this organization.",
+              ephemeral: true,
+            }));
 
-    const { id } = idData;
+          for (const domain of domains)
+            await db.query(
+              "DELETE FROM DOMAINS WHERE ORGANIZATION = $1 AND DOMAIN = $2;",
+              [id, domain]
+            );
 
-    const { rowCount: isMember } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
-      [interaction.user.id, id]
-    );
+          await interaction.reply({
+            content: `Deleted ${domains.length} domains.`,
+            ephemeral: true,
+          });
+        }
+        break;
+      case "clear":
+        {
+          const { rowCount: isOwner } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
+            [interaction.user.id, id]
+          );
 
-    if (isMember !== 1)
-      return void (await interaction.reply({
-        content: "You aren't in this organization.",
-        ephemeral: true,
-      }));
+          if (isOwner !== 1)
+            return void (await interaction.reply({
+              content: "You aren't the owner of this organization.",
+              ephemeral: true,
+            }));
 
-    for (const domain of domains)
-      await db.query(
-        "DELETE FROM DOMAINS WHERE ORGANIZATION = $1 AND DOMAIN = $2;",
-        [id, domain]
-      );
+          const { rowCount } = await db.query(
+            "DELETE FROM DOMAINS WHERE ORGANIZATION = $1;",
+            [id]
+          );
 
-    await interaction.reply({
-      content: `Deleted ${domains.length} domains.`,
-      ephemeral: true,
-    });
-  },
-});
-
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("delete-all-domains")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .setDescription("Deletes all the domains from your organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
-
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-      [vid]
-    );
-
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
-
-    const { id } = idData;
-
-    const { rowCount: isOwner } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-      [interaction.user.id, id]
-    );
-
-    if (isOwner !== 1)
-      return void (await interaction.reply({
-        content: "You aren't the owner of this organization.",
-        ephemeral: true,
-      }));
-
-    const { rowCount } = await db.query(
-      "DELETE FROM DOMAINS WHERE ORGANIZATION = $1;",
-      [id]
-    );
-
-    await interaction.reply({
-      content: `Deleted ${rowCount} domains.`,
-      ephemeral: true,
-    });
+          await interaction.reply({
+            content: `Deleted ${rowCount} domains.`,
+            ephemeral: true,
+          });
+        }
+        break;
+    }
   },
 });
 
