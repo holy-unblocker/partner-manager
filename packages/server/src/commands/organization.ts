@@ -235,7 +235,7 @@ registerCommand({
     )
     .addSubcommand((command) =>
       command
-        .setName("invite")
+        .setName("add")
         .addStringOption(
           new SlashCommandStringOption()
             .setName("id")
@@ -250,8 +250,8 @@ registerCommand({
         )
         .addBooleanOption(
           new SlashCommandBooleanOption()
-            .setName("owner")
-            .setDescription("Whether the user will be added as an owner")
+            .setName("notify")
+            .setDescription("Whether the user should be notified")
             .setRequired(false)
         )
         .setDescription("Invites a user to an organization")
@@ -277,6 +277,12 @@ registerCommand({
             .setDescription("Whether the user will be set to an owner")
             .setRequired(false)
         )
+        .addBooleanOption(
+          new SlashCommandBooleanOption()
+            .setName("notify")
+            .setDescription("Whether the user should be notified")
+            .setRequired(false)
+        )
         .setDescription("Promotes/demotes a user in the organization")
     )
     .addSubcommand((command) =>
@@ -293,6 +299,12 @@ registerCommand({
             .setName("user")
             .setDescription("User to fire")
             .setRequired(true)
+        )
+        .addBooleanOption(
+          new SlashCommandBooleanOption()
+            .setName("notify")
+            .setDescription("Whether the user should be notified")
+            .setRequired(false)
         )
         .setDescription("Fires a user from the organization")
     )
@@ -435,11 +447,12 @@ registerCommand({
           });
         }
         break;
-      case "invite":
+      case "add":
         {
           const vid = interaction.options.getString("id", true);
           const user = interaction.options.getUser("user", true);
-          const owner = interaction.options.getBoolean("owner", false) || false;
+          const notify =
+            interaction.options.getBoolean("notify", false) || false;
 
           // Locate an organization with the VID and get the ID
           // Then add a membership to the MEMBERSHIPS table
@@ -482,15 +495,33 @@ registerCommand({
             }));
 
           const { rowCount } = await db.query<{ id: string }>(
-            "INSERT INTO MEMBERSHIPS (ID, ORGANIZATION, OWNER) VALUES($1, $2, $3);",
-            [user.id, id, owner]
+            "INSERT INTO MEMBERSHIPS (ID, ORGANIZATION) VALUES($1, $2);",
+            [user.id, id]
           );
 
           if (rowCount !== 1) throw new RangeError("Couldn't add member");
 
+          let failureDMing = false;
+
+          if (notify)
+            try {
+              const dm = await user.createDM();
+              await dm.send(
+                `You've been added to the organiation ${vid} by <@${interaction.user.id}>`
+              );
+            } catch {
+              failureDMing = true;
+            }
+
           await interaction.reply({
             ephemeral: true,
-            content: `<@${user.id}> has been added to organization ${vid}`,
+            content: `<@${user.id}> has been added to organization ${vid}.${
+              notify
+                ? failureDMing
+                  ? " However, I was unable to DM them."
+                  : " They have been notified."
+                : ""
+            }`,
           });
         }
         break;
@@ -499,6 +530,8 @@ registerCommand({
           const vid = interaction.options.getString("id", true);
           const user = interaction.options.getUser("user", true);
           const owner = interaction.options.getBoolean("owner", true);
+          const notify =
+            interaction.options.getBoolean("notify", false) || false;
 
           // Locate an organization with the VID and get the ID
           // Then add a membership to the MEMBERSHIPS table
@@ -540,11 +573,31 @@ registerCommand({
               ephemeral: true,
             }));
 
+          let failureDMing = false;
+
+          if (notify)
+            try {
+              const dm = await user.createDM();
+              await dm.send(
+                `You've been set to ${
+                  owner ? "owner" : "member"
+                } in the organiation ${vid} by <@${interaction.user.id}>`
+              );
+            } catch {
+              failureDMing = true;
+            }
+
           await interaction.reply({
             ephemeral: true,
             content: `<@${user.id}> has been set to ${
               owner ? "owner" : "member"
-            } of organization.`,
+            } of organization.${
+              notify
+                ? failureDMing
+                  ? " However, I was unable to DM them."
+                  : " They have been notified."
+                : ""
+            }`,
           });
         }
         break;
@@ -552,6 +605,8 @@ registerCommand({
         {
           const vid = interaction.options.getString("id", true);
           const user = interaction.options.getUser("user", true);
+          const notify =
+            interaction.options.getBoolean("notify", false) || false;
 
           // Locate an organization with the VID and get the ID
           // Then add a membership to the MEMBERSHIPS table
@@ -582,20 +637,39 @@ registerCommand({
               ephemeral: true,
             }));
 
-          const { rowCount: promoted } = await db.query(
+          // allow organization takeovers:
+          /*const { rowCount: fireIsOwner } = await db.query(
             "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
             [user.id, id]
           );
 
-          if (promoted !== 0)
+          if (fireIsOwner !== 0)
             return void (await interaction.reply({
               content: "User is not in the organization/is an owner.",
               ephemeral: true,
-            }));
+            }));*/
+
+          let failureDMing = false;
+
+          if (notify)
+            try {
+              const dm = await user.createDM();
+              await dm.send(
+                `You've been fired from ${vid} by <@${interaction.user.id}>`
+              );
+            } catch {
+              failureDMing = true;
+            }
 
           await interaction.reply({
             ephemeral: true,
-            content: `<@${user.id}> has been fired from organization.`,
+            content: `<@${user.id}> has been fired from organization.${
+              notify
+                ? failureDMing
+                  ? " However, I was unable to DM them."
+                  : " They have been notified."
+                : ""
+            }`,
           });
         }
         break;
