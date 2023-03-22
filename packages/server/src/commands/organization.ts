@@ -200,429 +200,444 @@ registerCommand({
 
 registerCommand({
   data: new SlashCommandBuilder()
-    .setName("orgs")
-    .setDescription("Lists your organizations"),
+    .setName("org")
+    .setDescription("Manage your organizations")
+    .addSubcommand((command) =>
+      command.setName("list").setDescription("List the organizations you're in")
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("new")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("name")
+            .setDescription("Description of the organization")
+            .setRequired(true)
+        )
+        .setDescription("Creates an organization")
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("delete")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .setDescription("Deletes an organization")
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("invite")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .addUserOption(
+          new SlashCommandUserOption()
+            .setName("user")
+            .setDescription("User to invite to organization")
+            .setRequired(true)
+        )
+        .addBooleanOption(
+          new SlashCommandBooleanOption()
+            .setName("owner")
+            .setDescription("Whether the user will be added as an owner")
+            .setRequired(false)
+        )
+        .setDescription("Invites a user to an organization")
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("update")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .addUserOption(
+          new SlashCommandUserOption()
+            .setName("user")
+            .setDescription("User to promote")
+            .setRequired(true)
+        )
+        .addBooleanOption(
+          new SlashCommandBooleanOption()
+            .setName("owner")
+            .setDescription("Whether the user will be set to an owner")
+            .setRequired(false)
+        )
+        .setDescription("Promotes/demotes a user in the organization")
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("fire")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .addUserOption(
+          new SlashCommandUserOption()
+            .setName("user")
+            .setDescription("User to fire")
+            .setRequired(true)
+        )
+        .setDescription("Fires a user from the organization")
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("leave")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .setDescription("Leave the organization")
+    ),
   async execute(interaction) {
-    const orgs = await fetchOrgs(interaction.user.id);
+    switch (interaction.options.getSubcommand(true)) {
+      case "list":
+        {
+          const orgs = await fetchOrgs(interaction.user.id);
 
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder().setTitle("Organizations").addFields(
-          orgs.map((o) => ({
-            name: o.name,
-            value: `Enabled: ${o.enabled}\nOwner: ${o.members
-              .filter((m) => m.owner)
-              .map((m) => `<@${m.id}>`)
-              .join(" ")}\nMembers:\n${o.members
-              .map((m) => `<@${m.id}>`)
-              .join("\n")}`,
-          }))
-        ),
-      ],
-      ephemeral: true,
-    });
-  },
-});
+          await interaction.reply({
+            embeds: [
+              new EmbedBuilder().setTitle("Organizations").addFields(
+                orgs.map((o) => ({
+                  name: o.name,
+                  value: `Enabled: ${o.enabled}\nOwner: ${o.members
+                    .filter((m) => m.owner)
+                    .map((m) => `<@${m.id}>`)
+                    .join(" ")}\nMembers:\n${o.members
+                    .map((m) => `<@${m.id}>`)
+                    .join("\n")}`,
+                }))
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+        break;
+      case "new":
+        {
+          const vid = interaction.options.getString("id", true).toLowerCase();
+          const name = interaction.options.getString("name", true);
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("new-org")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("name")
-        .setDescription("Description of the organization")
-        .setRequired(true)
-    )
-    .setDescription("Creates an organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true).toLowerCase();
-    const name = interaction.options.getString("name", true);
+          const { rowCount: existingOrgs } = await db.query<{ id: string }>(
+            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+            [vid]
+          );
 
-    const { rowCount: existingOrgs } = await db.query<{ id: string }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-      [vid]
-    );
+          if (existingOrgs !== 0)
+            return void (await interaction.reply({
+              content: "Organization with ID already exists",
+              ephemeral: true,
+            }));
 
-    if (existingOrgs !== 0)
-      return void (await interaction.reply({
-        content: "Organization with ID already exists",
-        ephemeral: true,
-      }));
+          const {
+            rows: [{ id }],
+          } = await db.query<{ id: string }>(
+            `INSERT INTO ORGANIZATIONS (VID, NAME) VALUES ($1, $2) RETURNING ID;`,
+            [vid, name]
+          );
 
-    const {
-      rows: [{ id }],
-    } = await db.query<{ id: string }>(
-      `INSERT INTO ORGANIZATIONS (VID, NAME) VALUES ($1, $2) RETURNING ID;`,
-      [vid, name]
-    );
+          const { rowCount } = await db.query<{ id: string }>(
+            `INSERT INTO MEMBERSHIPS (ID, ORGANIZATION, OWNER) VALUES ($1, $2, $3);`,
+            [interaction.user.id, id, true]
+          );
 
-    const { rowCount } = await db.query<{ id: string }>(
-      `INSERT INTO MEMBERSHIPS (ID, ORGANIZATION, OWNER) VALUES ($1, $2, $3);`,
-      [interaction.user.id, id, true]
-    );
+          if (rowCount !== 1)
+            return void (await interaction.reply({
+              ephemeral: true,
+              content:
+                "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
+            }));
 
-    if (rowCount !== 1)
-      return void (await interaction.reply({
-        ephemeral: true,
-        content:
-          "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
-      }));
+          await interaction.reply({
+            ephemeral: true,
+            content: "User has been added to organization.",
+          });
+        }
+        break;
+      case "delete":
+        {
+          const vid = interaction.options.getString("id", true);
 
-    await interaction.reply({
-      ephemeral: true,
-      content: "User has been added to organization.",
-    });
-  },
-});
+          const {
+            rows: [idData],
+          } = await db.query<{ id: number }>(
+            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+            [vid]
+          );
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("delete-org")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .setDescription("Deletes an organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
+          if (!idData)
+            return void (await interaction.reply({
+              content: "The organization with ID doesn't exist.",
+              ephemeral: true,
+            }));
 
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-      [vid]
-    );
+          const { id } = idData;
 
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
+          const { rowCount: isOwner } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
+            [interaction.user.id, id]
+          );
 
-    const { id } = idData;
+          if (isOwner !== 1)
+            return void (await interaction.reply({
+              content: "You aren't the owner of this organization.",
+              ephemeral: true,
+            }));
 
-    const { rowCount: isOwner } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-      [interaction.user.id, id]
-    );
+          await interaction.reply({
+            content: "TODO.",
+            ephemeral: true,
+          });
 
-    if (isOwner !== 1)
-      return void (await interaction.reply({
-        content: "You aren't the owner of this organization.",
-        ephemeral: true,
-      }));
+          const { rowCount: memberRowCount } = await db.query<{ id: string }>(
+            `DELETE FROM MEMBERS WHERE ORGANIZATION = $1;`,
+            [id]
+          );
 
-    await interaction.reply({
-      content: "TODO.",
-      ephemeral: true,
-    });
+          const { rowCount: domainRowCount } = await db.query<{ id: string }>(
+            `DELETE FROM DOMAINS WHERE ORGANIZATION = $1;`,
+            [id]
+          );
 
-    const { rowCount: memberRowCount } = await db.query<{ id: string }>(
-      `DELETE FROM MEMBERS WHERE ORGANIZATION = $1;`,
-      [id]
-    );
+          const { rowCount: orgRowCount } = await db.query<{ id: string }>(
+            `DELETE FROM ORGANIZATIONS WHERE ID = $1;`,
+            [id]
+          );
 
-    const { rowCount: domainRowCount } = await db.query<{ id: string }>(
-      `DELETE FROM DOMAINS WHERE ORGANIZATION = $1;`,
-      [id]
-    );
+          if (orgRowCount !== 1)
+            return void (await interaction.reply({
+              ephemeral: true,
+              content:
+                "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
+            }));
 
-    const { rowCount: orgRowCount } = await db.query<{ id: string }>(
-      `DELETE FROM ORGANIZATIONS WHERE ID = $1;`,
-      [id]
-    );
+          await interaction.reply({
+            ephemeral: true,
+            content: `Fired ${memberRowCount} members and deleted ${domainRowCount} domains.`,
+          });
+        }
+        break;
+      case "invite":
+        {
+          const vid = interaction.options.getString("id", true);
+          const user = interaction.options.getUser("user", true);
+          const owner = interaction.options.getBoolean("owner", false) || false;
 
-    if (orgRowCount !== 1)
-      return void (await interaction.reply({
-        ephemeral: true,
-        content:
-          "An error occured when attempting to add user to organization. Try again later or report this to the bot maintainer.",
-      }));
+          // Locate an organization with the VID and get the ID
+          // Then add a membership to the MEMBERSHIPS table
+          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
+          const {
+            rows: [idData],
+          } = await db.query<{ id: number }>(
+            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+            [vid]
+          );
 
-    await interaction.reply({
-      ephemeral: true,
-      content: `Fired ${memberRowCount} members and deleted ${domainRowCount} domains.`,
-    });
-  },
-});
+          if (!idData)
+            return void (await interaction.reply({
+              content: "The organization with ID doesn't exist.",
+              ephemeral: true,
+            }));
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("invite")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .addUserOption(
-      new SlashCommandUserOption()
-        .setName("user")
-        .setDescription("User to invite to organization")
-        .setRequired(true)
-    )
-    .addBooleanOption(
-      new SlashCommandBooleanOption()
-        .setName("owner")
-        .setDescription("Whether the user will be added as an owner")
-        .setRequired(false)
-    )
-    .setDescription("Invites a user to an organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
-    const user = interaction.options.getUser("user", true);
-    const owner = interaction.options.getBoolean("owner", false) || false;
+          const { id } = idData;
 
-    // Locate an organization with the VID and get the ID
-    // Then add a membership to the MEMBERSHIPS table
-    // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-      [vid]
-    );
+          const { rowCount: isOwner } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
+            [interaction.user.id, id]
+          );
 
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
+          if (isOwner !== 1)
+            return void (await interaction.reply({
+              content: "You aren't the owner of this organization.",
+              ephemeral: true,
+            }));
 
-    const { id } = idData;
+          const { rowCount: inOrg } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
+            [user.id, id]
+          );
 
-    const { rowCount: isOwner } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-      [interaction.user.id, id]
-    );
+          if (inOrg !== 0)
+            return void (await interaction.reply({
+              content: "User is already in organization.",
+              ephemeral: true,
+            }));
 
-    if (isOwner !== 1)
-      return void (await interaction.reply({
-        content: "You aren't the owner of this organization.",
-        ephemeral: true,
-      }));
+          const { rowCount } = await db.query<{ id: string }>(
+            "INSERT INTO MEMBERSHIPS (ID, ORGANIZATION, OWNER) VALUES($1, $2, $3);",
+            [user.id, id, owner]
+          );
 
-    const { rowCount: inOrg } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
-      [user.id, id]
-    );
+          if (rowCount !== 1) throw new RangeError("Couldn't add member");
 
-    if (inOrg !== 0)
-      return void (await interaction.reply({
-        content: "User is already in organization.",
-        ephemeral: true,
-      }));
+          await interaction.reply({
+            ephemeral: true,
+            content: `<@${user.id}> has been added to organization ${vid}`,
+          });
+        }
+        break;
+      case "update":
+        {
+          const vid = interaction.options.getString("id", true);
+          const user = interaction.options.getUser("user", true);
+          const owner = interaction.options.getBoolean("owner", true);
 
-    const { rowCount } = await db.query<{ id: string }>(
-      "INSERT INTO MEMBERSHIPS (ID, ORGANIZATION, OWNER) VALUES($1, $2, $3);",
-      [user.id, id, owner]
-    );
+          // Locate an organization with the VID and get the ID
+          // Then add a membership to the MEMBERSHIPS table
+          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
+          const {
+            rows: [idData],
+          } = await db.query<{ id: number }>(
+            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+            [vid]
+          );
 
-    if (rowCount !== 1) throw new RangeError("Couldn't add member");
+          if (!idData)
+            return void (await interaction.reply({
+              content: "The organization with ID doesn't exist.",
+              ephemeral: true,
+            }));
 
-    await interaction.reply({
-      ephemeral: true,
-      content: `<@${user.id}> has been added to organization ${vid}`,
-    });
-  },
-});
+          const { id } = idData;
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("update")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .addUserOption(
-      new SlashCommandUserOption()
-        .setName("user")
-        .setDescription("User to promote")
-        .setRequired(true)
-    )
-    .addBooleanOption(
-      new SlashCommandBooleanOption()
-        .setName("owner")
-        .setDescription("Whether the user will be set to an owner")
-        .setRequired(false)
-    )
-    .setDescription("Promotes/demotes a user in the organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
-    const user = interaction.options.getUser("user", true);
-    const owner = interaction.options.getBoolean("owner", true);
+          const { rowCount: isOwner } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
+            [interaction.user.id, id]
+          );
 
-    // Locate an organization with the VID and get the ID
-    // Then add a membership to the MEMBERSHIPS table
-    // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-      [vid]
-    );
+          if (isOwner !== 1)
+            return void (await interaction.reply({
+              content: "You aren't the owner of this organization.",
+              ephemeral: true,
+            }));
 
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
+          const { rowCount: promoted } = await db.query(
+            "UPDATE MEMBERSHIPS SET OWNER = $1 WHERE ID = $2 AND ORGANIZATION = $3;",
+            [owner, user.id, id]
+          );
 
-    const { id } = idData;
+          if (promoted !== 0)
+            return void (await interaction.reply({
+              content: "User not found/already set to status.",
+              ephemeral: true,
+            }));
 
-    const { rowCount: isOwner } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-      [interaction.user.id, id]
-    );
+          await interaction.reply({
+            ephemeral: true,
+            content: `<@${user.id}> has been set to ${
+              owner ? "owner" : "member"
+            } of organization.`,
+          });
+        }
+        break;
+      case "fire":
+        {
+          const vid = interaction.options.getString("id", true);
+          const user = interaction.options.getUser("user", true);
 
-    if (isOwner !== 1)
-      return void (await interaction.reply({
-        content: "You aren't the owner of this organization.",
-        ephemeral: true,
-      }));
+          // Locate an organization with the VID and get the ID
+          // Then add a membership to the MEMBERSHIPS table
+          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
+          const {
+            rows: [idData],
+          } = await db.query<{ id: number }>(
+            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
+            [vid]
+          );
 
-    const { rowCount: promoted } = await db.query(
-      "UPDATE MEMBERSHIPS SET OWNER = $1 WHERE ID = $2 AND ORGANIZATION = $3;",
-      [owner, user.id, id]
-    );
+          if (!idData)
+            return void (await interaction.reply({
+              content: "The organization with ID doesn't exist.",
+              ephemeral: true,
+            }));
 
-    if (promoted !== 0)
-      return void (await interaction.reply({
-        content: "User not found/already set to status.",
-        ephemeral: true,
-      }));
+          const { id } = idData;
 
-    await interaction.reply({
-      ephemeral: true,
-      content: `<@${user.id}> has been set to ${
-        owner ? "owner" : "member"
-      } of organization.`,
-    });
-  },
-});
+          const { rowCount: isOwner } = await db.query(
+            "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
+            [interaction.user.id, id]
+          );
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("fire")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .addUserOption(
-      new SlashCommandUserOption()
-        .setName("user")
-        .setDescription("User to fire")
-        .setRequired(true)
-    )
-    .setDescription("Fires a user from the organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
-    const user = interaction.options.getUser("user", true);
+          if (isOwner !== 1)
+            return void (await interaction.reply({
+              content: "You aren't the owner of this organization.",
+              ephemeral: true,
+            }));
 
-    // Locate an organization with the VID and get the ID
-    // Then add a membership to the MEMBERSHIPS table
-    // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
-      [vid]
-    );
+          const { rowCount: promoted } = await db.query(
+            "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
+            [user.id, id]
+          );
 
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
+          if (promoted !== 0)
+            return void (await interaction.reply({
+              content: "User is not in the organization/is an owner.",
+              ephemeral: true,
+            }));
 
-    const { id } = idData;
+          await interaction.reply({
+            ephemeral: true,
+            content: `<@${user.id}> has been fired from organization.`,
+          });
+        }
+        break;
+      case "leave":
+        {
+          const vid = interaction.options.getString("id", true);
 
-    const { rowCount: isOwner } = await db.query(
-      "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
-      [interaction.user.id, id]
-    );
+          // Locate an organization with the VID and get the ID
+          // Then add a membership to the MEMBERSHIPS table
+          // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
+          const {
+            rows: [idData],
+          } = await db.query<{ id: number }>(
+            "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+            [vid]
+          );
 
-    if (isOwner !== 1)
-      return void (await interaction.reply({
-        content: "You aren't the owner of this organization.",
-        ephemeral: true,
-      }));
+          if (!idData)
+            return void (await interaction.reply({
+              content: "The organization with ID doesn't exist.",
+              ephemeral: true,
+            }));
 
-    const { rowCount: promoted } = await db.query(
-      "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
-      [user.id, id]
-    );
+          const { id } = idData;
 
-    if (promoted !== 0)
-      return void (await interaction.reply({
-        content: "User is not in the organization/is an owner.",
-        ephemeral: true,
-      }));
+          const { rowCount: promoted } = await db.query(
+            "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
+            [interaction.user.id, id]
+          );
 
-    await interaction.reply({
-      ephemeral: true,
-      content: `<@${user.id}> has been fired from organization.`,
-    });
-  },
-});
+          if (promoted !== 0)
+            return void (await interaction.reply({
+              content: "You're not in the organization.",
+              ephemeral: true,
+            }));
 
-registerCommand({
-  data: new SlashCommandBuilder()
-    .setName("quit")
-    .addStringOption(
-      new SlashCommandStringOption()
-        .setName("id")
-        .setDescription("Short identifier for the organization")
-        .setRequired(true)
-    )
-    .setDescription("Quits the organization"),
-  async execute(interaction) {
-    const vid = interaction.options.getString("id", true);
-
-    // Locate an organization with the VID and get the ID
-    // Then add a membership to the MEMBERSHIPS table
-    // We can't just use the VID because that is a virtual ID which is like a memorizable ID. We need to resolve the real organization ID
-    const {
-      rows: [idData],
-    } = await db.query<{ id: number }>(
-      "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
-      [vid]
-    );
-
-    if (!idData)
-      return void (await interaction.reply({
-        content: "The organization with ID doesn't exist.",
-        ephemeral: true,
-      }));
-
-    const { id } = idData;
-
-    const { rowCount: promoted } = await db.query(
-      "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
-      [interaction.user.id, id]
-    );
-
-    if (promoted !== 0)
-      return void (await interaction.reply({
-        content: "You're not in the organization.",
-        ephemeral: true,
-      }));
-
-    await interaction.reply({
-      ephemeral: true,
-      content: `You have quit the organization.`,
-    });
+          await interaction.reply({
+            ephemeral: true,
+            content: `You have quit the organization.`,
+          });
+        }
+        break;
+    }
   },
 });
