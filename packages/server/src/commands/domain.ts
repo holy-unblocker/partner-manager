@@ -41,7 +41,7 @@ registerCommand(
           .replace(/\s/, "")
           .split(", ");
 
-        if (!(await commandIsMember(interaction, id))) return;
+        if (!(await commandIsMember(interaction, id.id))) return;
 
         for (const domain of domains)
           await db.query(
@@ -80,7 +80,7 @@ registerCommand(
           .replace(/\s/, "")
           .split(", ");
 
-        if (!(await commandIsMember(interaction, id))) return;
+        if (!(await commandIsMember(interaction, id.id))) return;
 
         for (const domain of domains)
           await db.query(
@@ -108,7 +108,7 @@ registerCommand(
         const id = await getCommandID(interaction);
         if (!id) return;
 
-        if (!(await commandIsOwner(interaction, id))) return;
+        if (!(await commandIsOwner(interaction, id.id))) return;
 
         const { rowCount } = await db.query(
           "DELETE FROM DOMAINS WHERE ORGANIZATION = $1;",
@@ -136,16 +136,17 @@ registerCommand(
         const id = await getCommandID(interaction);
         if (!id) return;
 
-        await interaction.reply(
-          (
+        await interaction.reply({
+          content: `Domains for ${id.displayID}: ${(
             await db.query<{ domain: string }>(
               "SELECT DOMAIN FROM DOMAINS WHERE ORGANIZATION = $1;",
               [id]
             )
           ).rows
             .map((m) => m.domain)
-            .join("\n")
-        );
+            .join("\n")}`,
+          ephemeral: true,
+        });
       },
     }
   )

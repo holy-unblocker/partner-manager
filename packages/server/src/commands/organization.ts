@@ -110,7 +110,7 @@ registerCommand(
         const id = await getCommandID(interaction);
         if (!id) return;
 
-        if (!(await commandIsOwner(interaction, id))) return;
+        if (!(await commandIsOwner(interaction, id.id))) return;
 
         await interaction.reply({
           content: "TODO.",
@@ -146,7 +146,7 @@ registerCommand(
         const user = interaction.options.getUser("user", true);
         const notify = interaction.options.getBoolean("notify", false) || false;
 
-        if (!(await commandIsOwner(interaction, id))) return;
+        if (!(await commandIsOwner(interaction, id.id))) return;
 
         const { rowCount: inOrg } = await db.query(
           "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
@@ -225,7 +225,7 @@ registerCommand(
         const owner = interaction.options.getBoolean("owner", true);
         const notify = interaction.options.getBoolean("notify", false) || false;
 
-        if (!(await commandIsOwner(interaction, id))) return;
+        if (!(await commandIsOwner(interaction, id.id))) return;
 
         const { rowCount: promoted } = await db.query(
           "UPDATE MEMBERSHIPS SET OWNER = $1 WHERE ID = $2 AND ORGANIZATION = $3;",
@@ -256,7 +256,7 @@ registerCommand(
           ephemeral: true,
           content: `<@${user.id}> has been set to ${
             owner ? "owner" : "member"
-          } of organization.${
+          } of organization ${id.displayID}.${
             notify
               ? failureDMing
                 ? " However, I was unable to DM them."
@@ -294,7 +294,7 @@ registerCommand(
         const user = interaction.options.getUser("user", true);
         const notify = interaction.options.getBoolean("notify", false) || false;
 
-        if (!(await commandIsOwner(interaction, id))) return;
+        if (!(await commandIsOwner(interaction, id.id))) return;
 
         // allow organization takeovers:
         /*const { rowCount: fireIsOwner } = await db.query(
@@ -322,7 +322,9 @@ registerCommand(
 
         await interaction.reply({
           ephemeral: true,
-          content: `<@${user.id}> has been fired from organization.${
+          content: `<@${user.id}> has been fired from organization ${
+            id.displayID
+          }.${
             notify
               ? failureDMing
                 ? " However, I was unable to DM them."

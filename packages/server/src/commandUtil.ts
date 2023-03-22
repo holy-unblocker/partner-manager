@@ -36,7 +36,7 @@ export async function fetchOrgs(user: string) {
 }
 
 export async function getCommandID(interaction: ChatInputCommandInteraction) {
-  const vid = interaction.options.getString("id", true);
+  const vid = interaction.options.getString("id", true).toLowerCase().trim();
 
   const {
     rows: [idData],
@@ -51,7 +51,10 @@ export async function getCommandID(interaction: ChatInputCommandInteraction) {
       ephemeral: true,
     }));
 
-  return idData.id;
+  return {
+    id: idData.id,
+    displayID: vid,
+  };
 }
 
 export async function commandIsOwner(
