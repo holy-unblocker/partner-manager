@@ -64,7 +64,7 @@ registerCommand(
         const name = interaction.options.getString("name", true);
 
         const { rowCount: existingOrgs } = await db.query<{ id: string }>(
-          "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;'",
+          "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
           [vid]
         );
 
@@ -151,12 +151,14 @@ registerCommand(
 
         if (!(await commandIsOwner(interaction, id.id))) return;
 
-        const { rowCount: inOrg } = await db.query(
+        const {
+          rows: [{ count: inOrg }],
+        } = await db.query<{ count: string }>(
           "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
-          [user.id, id]
+          [user.id, id.id]
         );
 
-        if (inOrg !== 0)
+        if (inOrg !== "0")
           return void (await interaction.reply({
             content: "User is already in organization.",
             ephemeral: true,
@@ -164,7 +166,7 @@ registerCommand(
 
         const { rowCount } = await db.query<{ id: string }>(
           "INSERT INTO MEMBERSHIPS (ID, ORGANIZATION) VALUES($1, $2);",
-          [user.id, id]
+          [user.id, id.id]
         );
 
         if (rowCount !== 1) throw new RangeError("Couldn't add member");
@@ -175,7 +177,7 @@ registerCommand(
           try {
             const dm = await user.createDM();
             await dm.send(
-              `You've been added to the organiation ${id} by <@${interaction.user.id}>`
+              `You've been added to the organization ${id.name} by <@${interaction.user.id}>`
             );
           } catch {
             failureDMing = true;
@@ -183,7 +185,9 @@ registerCommand(
 
         await interaction.reply({
           ephemeral: true,
-          content: `<@${user.id}> has been added to organization ${id}.${
+          content: `<@${user.id}> has been added to organization ${
+            id.displayID
+          }.${
             notify
               ? failureDMing
                 ? " However, I was unable to DM them."
@@ -232,10 +236,10 @@ registerCommand(
 
         const { rowCount: promoted } = await db.query(
           "UPDATE MEMBERSHIPS SET OWNER = $1 WHERE ID = $2 AND ORGANIZATION = $3;",
-          [owner, user.id, id]
+          [owner, user.id, id.id]
         );
 
-        if (promoted !== 0)
+        if (promoted !== 1)
           return void (await interaction.reply({
             content: "User not found/already set to status.",
             ephemeral: true,
@@ -249,7 +253,7 @@ registerCommand(
             await dm.send(
               `You've been set to ${
                 owner ? "owner" : "member"
-              } in the organiation ${id} by <@${interaction.user.id}>`
+              } in the organization ${id.name} by <@${interaction.user.id}>`
             );
           } catch {
             failureDMing = true;
@@ -259,7 +263,7 @@ registerCommand(
           ephemeral: true,
           content: `<@${user.id}> has been set to ${
             owner ? "owner" : "member"
-          } of organization ${id.displayID}.${
+          } of organization ${id.name}.${
             notify
               ? failureDMing
                 ? " However, I was unable to DM them."
@@ -325,7 +329,7 @@ registerCommand(
 
         await interaction.reply({
           ephemeral: true,
-          content: `<@${user.id}> has been fired from organization ${
+          content: `<@${user.id}> has been fired from the organization ${
             id.displayID
           }.${
             notify
@@ -353,7 +357,7 @@ registerCommand(
 
         const { rowCount: promoted } = await db.query(
           "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
-          [interaction.user.id, id]
+          [interaction.user.id, id.id]
         );
 
         if (promoted !== 0)

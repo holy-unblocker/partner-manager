@@ -40,8 +40,8 @@ export async function getCommandID(interaction: ChatInputCommandInteraction) {
 
   const {
     rows: [idData],
-  } = await db.query<{ id: number }>(
-    "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",
+  } = await db.query<{ id: number; name: string }>(
+    "SELECT ID, NAME FROM ORGANIZATIONS WHERE VID = $1;",
     [vid]
   );
 
@@ -54,6 +54,7 @@ export async function getCommandID(interaction: ChatInputCommandInteraction) {
   return {
     id: idData.id,
     displayID: vid,
+    name: idData.name,
   };
 }
 
@@ -61,12 +62,14 @@ export async function commandIsOwner(
   interaction: ChatInputCommandInteraction,
   organizationID: number
 ) {
-  const { rowCount: isOwner } = await db.query(
+  const {
+    rows: [{ count: isOwner }],
+  } = await db.query<{ count: string }>(
     "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER;",
     [interaction.user.id, organizationID]
   );
 
-  if (isOwner !== 1)
+  if (isOwner !== "1")
     return void (await interaction.reply({
       content: "You aren't an owner in this organization.",
       ephemeral: true,
@@ -79,12 +82,14 @@ export async function commandIsMember(
   interaction: ChatInputCommandInteraction,
   organizationID: number
 ) {
-  const { rowCount: isMember } = await db.query(
+  const {
+    rows: [{ count: isMember }],
+  } = await db.query<{ count: string }>(
     "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2;",
     [interaction.user.id, organizationID]
   );
 
-  if (isMember !== 1)
+  if (isMember !== "1")
     return void (await interaction.reply({
       content: "You aren't in this organization.",
       ephemeral: true,
