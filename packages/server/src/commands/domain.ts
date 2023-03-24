@@ -121,7 +121,6 @@ registerCommand(
         });
       },
     },
-
     {
       data: new SlashCommandSubcommandBuilder()
         .setName("list")
