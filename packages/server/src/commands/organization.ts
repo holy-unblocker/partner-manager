@@ -1,6 +1,7 @@
 import { commandIsOwner, getCommandID, fetchOrgs } from "../commandUtil.js";
 import { CommandSubOnly, registerCommand } from "../commands.js";
 import db from "../db.js";
+import type { ChatInputCommandInteraction } from "discord.js";
 import {
   SlashCommandBuilder,
   SlashCommandStringOption,
@@ -9,6 +10,50 @@ import {
   SlashCommandBooleanOption,
   SlashCommandUserOption,
 } from "discord.js";
+
+async function doPromotion(
+  interaction: ChatInputCommandInteraction,
+  owner: boolean
+) {
+  const id = await getCommandID(interaction);
+  if (!id) return;
+  const user = interaction.options.getUser("user", true);
+  const notify = interaction.options.getBoolean("notify", false) || false;
+
+  if (!(await commandIsOwner(interaction, id.id))) return;
+
+  await db.query(
+    "SELECT COUNT(*) FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND OWNER = $3;",
+    [user.id, id.id, owner]
+  );
+
+  let failureDMing = false;
+
+  if (notify)
+    try {
+      const dm = await user.createDM();
+      await dm.send(
+        `You've been set to ${owner ? "owner" : "member"} in the organization ${
+          id.name
+        } by <@${interaction.user.id}>`
+      );
+    } catch {
+      failureDMing = true;
+    }
+
+  await interaction.reply({
+    ephemeral: true,
+    content: `<@${user.id}> has been set to ${
+      owner ? "owner" : "member"
+    } of organization ${id.name}.${
+      notify
+        ? failureDMing
+          ? " However, I was unable to DM them."
+          : " They have been notified."
+        : ""
+    }`,
+  });
+}
 
 registerCommand(
   new CommandSubOnly(
@@ -199,7 +244,7 @@ registerCommand(
     },
     {
       data: new SlashCommandSubcommandBuilder()
-        .setName("update")
+        .setName("demote")
         .addStringOption(
           new SlashCommandStringOption()
             .setName("id")
@@ -214,9 +259,27 @@ registerCommand(
         )
         .addBooleanOption(
           new SlashCommandBooleanOption()
-            .setName("owner")
-            .setDescription("Whether the user will be set to an owner")
+            .setName("notify")
+            .setDescription("Whether the user should be notified")
             .setRequired(false)
+        )
+        .setDescription("Demotes an organization owner to a member"),
+      execute: (interaction) => doPromotion(interaction, true),
+    },
+    {
+      data: new SlashCommandSubcommandBuilder()
+        .setName("promote")
+        .addStringOption(
+          new SlashCommandStringOption()
+            .setName("id")
+            .setDescription("Short identifier for the organization")
+            .setRequired(true)
+        )
+        .addUserOption(
+          new SlashCommandUserOption()
+            .setName("user")
+            .setDescription("User to promote")
+            .setRequired(true)
         )
         .addBooleanOption(
           new SlashCommandBooleanOption()
@@ -224,54 +287,8 @@ registerCommand(
             .setDescription("Whether the user should be notified")
             .setRequired(false)
         )
-        .setDescription("Promotes/demotes a user in the organization"),
-      execute: async (interaction) => {
-        const id = await getCommandID(interaction);
-        if (!id) return;
-        const user = interaction.options.getUser("user", true);
-        const owner = interaction.options.getBoolean("owner", true);
-        const notify = interaction.options.getBoolean("notify", false) || false;
-
-        if (!(await commandIsOwner(interaction, id.id))) return;
-
-        const { rowCount: promoted } = await db.query(
-          "UPDATE MEMBERSHIPS SET OWNER = $1 WHERE ID = $2 AND ORGANIZATION = $3;",
-          [owner, user.id, id.id]
-        );
-
-        if (promoted !== 1)
-          return void (await interaction.reply({
-            content: "User not found/already set to status.",
-            ephemeral: true,
-          }));
-
-        let failureDMing = false;
-
-        if (notify)
-          try {
-            const dm = await user.createDM();
-            await dm.send(
-              `You've been set to ${
-                owner ? "owner" : "member"
-              } in the organization ${id.name} by <@${interaction.user.id}>`
-            );
-          } catch {
-            failureDMing = true;
-          }
-
-        await interaction.reply({
-          ephemeral: true,
-          content: `<@${user.id}> has been set to ${
-            owner ? "owner" : "member"
-          } of organization ${id.name}.${
-            notify
-              ? failureDMing
-                ? " However, I was unable to DM them."
-                : " They have been notified."
-              : ""
-          }`,
-        });
-      },
+        .setDescription("Promotes an organization member to an owner"),
+      execute: (interaction) => doPromotion(interaction, true),
     },
     {
       data: new SlashCommandSubcommandBuilder()
