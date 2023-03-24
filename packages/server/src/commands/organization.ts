@@ -68,6 +68,7 @@ registerCommand(
         const orgs = await fetchOrgs(interaction.user.id);
 
         await interaction.reply({
+          ephemeral: true,
           embeds: [
             new EmbedBuilder().setTitle("Organizations").addFields(
               orgs.map((o) => ({
@@ -81,7 +82,6 @@ registerCommand(
               }))
             ),
           ],
-          ephemeral: true,
         });
       },
     },
@@ -161,8 +161,8 @@ registerCommand(
         if (!(await commandIsOwner(interaction, id.id))) return;
 
         await interaction.reply({
-          content: "TODO.",
           ephemeral: true,
+          content: "TODO.",
         });
       },
     },
