@@ -44,14 +44,21 @@ domain.addSubcommand(
 
     if (!(await commandIsMember(interaction, id.id))) return;
 
+    let added = 0;
+
     for (const domain of domains)
-      await db.query(
-        "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
-        [domain, id.id]
-      );
+      try {
+        await db.query(
+          "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
+          [domain, id.id]
+        );
+        added++;
+      } catch {
+        // probably a constraint thing
+      }
 
     await interaction.reply({
-      content: `Added ${domains.length} domains.`,
+      content: `Added ${added} domains.`,
       ephemeral: true,
     });
   }
