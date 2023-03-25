@@ -5,10 +5,7 @@ import { readFile, writeFile } from "node:fs/promises";
 
 await fetchDomains();
 
-// Every 30 minutes, fetch the domains
-setInterval(fetchDomains, 60e3 * 30);
-
-async function fetchDomains() {
+export default async function fetchDomains() {
   const res = await fetch(API_URL, {
     headers: {
       authorization: API_KEY.toString("base64url"),
