@@ -1,4 +1,5 @@
 import db from "./db.js";
+import { testPermission } from "./permissions.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 
 export async function fetchOrgs(user: string) {
@@ -94,6 +95,24 @@ export async function commandIsMember(
       content: "You aren't in this organization.",
       ephemeral: true,
     }));
+
+  return true;
+}
+
+export async function commandIsAuthorized(
+  interaction: ChatInputCommandInteraction
+) {
+  if (
+    !interaction.member ||
+    !interaction.guild ||
+    !(await testPermission(interaction.member, interaction.guild))
+  ) {
+    await interaction.reply({
+      content: "You don't have permission to perform this operation.",
+      ephemeral: true,
+    });
+    return false;
+  }
 
   return true;
 }
