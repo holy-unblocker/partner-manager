@@ -17,8 +17,6 @@ const domain = new CommandSubOnly(
     .setDescription("Domain management")
 );
 
-registerCommand(domain);
-
 domain.addSubcommand(
   new SlashCommandSubcommandBuilder()
     .setName("add")
@@ -154,3 +152,5 @@ domain.addSubcommand(
     });
   }
 );
+
+registerCommand(domain);
