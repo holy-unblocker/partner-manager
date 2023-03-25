@@ -325,7 +325,7 @@ org.addSubcommand(
     // allow organization takeovers:
     /*const { rowCount: fireIsOwner } = await db.query(
         "DELETE FROM MEMBERSHIPS WHERE ID = $1 AND ORGANIZATION = $2 AND NOT OWNER;",
-        [user.id, id]
+        [user.id, id.id]
       );
 
       if (fireIsOwner !== 0)

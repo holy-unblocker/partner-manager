@@ -47,7 +47,7 @@ domain.addSubcommand(
     for (const domain of domains)
       await db.query(
         "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
-        [domain, id]
+        [domain, id.id]
       );
 
     await interaction.reply({
@@ -115,7 +115,7 @@ domain.addSubcommand(
 
     const { rowCount } = await db.query(
       "DELETE FROM DOMAINS WHERE ORGANIZATION = $1;",
-      [id]
+      [id.id]
     );
 
     await interaction.reply({
@@ -143,7 +143,7 @@ domain.addSubcommand(
       content: `Domains for ${id.displayID}: ${(
         await db.query<{ domain: string }>(
           "SELECT DOMAIN FROM DOMAINS WHERE ORGANIZATION = $1;",
-          [id]
+          [id.id]
         )
       ).rows
         .map((m) => m.domain)
