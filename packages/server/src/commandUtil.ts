@@ -4,7 +4,22 @@ import {
   userIsMember,
   userIsOwner,
 } from "./util.js";
+import { validAddress } from "@shared-server/util";
 import type { ChatInputCommandInteraction } from "discord.js";
+
+export async function commandValidDomain(
+  interaction: ChatInputCommandInteraction,
+  domain: string
+) {
+  if (validAddress(domain)) return true;
+
+  await interaction.reply({
+    content: "Invalid domain",
+    ephemeral: true,
+  });
+
+  return false;
+}
 
 export async function getCommandID(interaction: ChatInputCommandInteraction) {
   const vid = interaction.options.getString("id", true).trim().toLowerCase();
@@ -53,7 +68,7 @@ export async function commandIsAuthorized(
   if (
     !interaction.member ||
     !interaction.guild ||
-    !(await testPermission(interaction.member, interaction.guild))
+    !(await testPermission(interaction.member))
   ) {
     await interaction.reply({
       content: "You don't have permission to perform this operation.",
