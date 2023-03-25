@@ -1,26 +1,11 @@
+import permissions from "./config.js";
+import { PermissionType } from "./configTypes.js";
 import db from "./db.js";
-import type { APIInteractionGuildMember, Guild, GuildMember } from "discord.js";
-
-export enum PermissionType {
-  User,
-  Role,
-}
-
-export interface Permission {
-  type: PermissionType;
-  id: string;
-}
-
-export const permissions: Permission[] = [];
-
-const mainGuild = "419123358698045453";
+import type { APIInteractionGuildMember, GuildMember } from "discord.js";
 
 export async function testPermission(
-  member: GuildMember | APIInteractionGuildMember,
-  guild: Guild
+  member: GuildMember | APIInteractionGuildMember
 ) {
-  if (guild.id !== mainGuild) return false;
-
   for (const permission of permissions)
     switch (permission.type) {
       case PermissionType.User:
