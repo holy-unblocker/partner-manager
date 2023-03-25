@@ -3,8 +3,6 @@ import { validAddress } from "@shared-server/util";
 import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 
-await fetchDomains();
-
 export default async function fetchDomains() {
   const res = await fetch(API_URL, {
     headers: {
