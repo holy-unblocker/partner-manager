@@ -21,23 +21,18 @@ export class CommandOptionsOnly {
   }
 }
 
-interface SubCommand {
-  data: SlashCommandSubcommandBuilder;
-  execute: (interaction: ChatInputCommandInteraction) => Promise<void> | void;
-}
-
 export class CommandSubOnly {
   data: SlashCommandSubcommandsOnlyBuilder;
   private subcommands = new Map<string, CommandExecutor>();
-  constructor(
-    data: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
-    ...subcommands: SubCommand[]
-  ) {
-    for (const s of subcommands) {
-      data = data.addSubcommand(s.data);
-      this.subcommands.set(s.data.name, s.execute);
-    }
+  constructor(data: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder) {
     this.data = data;
+  }
+  addSubcommand(
+    data: SlashCommandSubcommandBuilder,
+    execute: (interaction: ChatInputCommandInteraction) => Promise<void> | void
+  ) {
+    this.data = this.data.addSubcommand(data);
+    this.subcommands.set(data.name, execute);
   }
   handle(interaction: ChatInputCommandInteraction) {
     const sc = interaction.options.getSubcommand(true);
