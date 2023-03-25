@@ -40,7 +40,7 @@ domain.addSubcommand(
     const domains = interaction.options
       .getString("domains", true)
       .replace(/\s/, "")
-      .split(", ");
+      .split(",");
 
     if (!(await commandIsMember(interaction, id.id))) return;
 
