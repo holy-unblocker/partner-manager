@@ -1,6 +1,7 @@
 import {
   commandIsMember,
   commandIsOwner,
+  commandValidDomain,
   getCommandID,
 } from "../commandUtil.js";
 import { CommandSubOnly, registerCommand } from "../commands.js";
@@ -46,7 +47,9 @@ domain.addSubcommand(
 
     let added = 0;
 
-    for (const domain of domains)
+    for (const domain of domains) {
+      if (!commandValidDomain(interaction, domain)) return;
+
       try {
         await db.query(
           "INSERT INTO DOMAINS (DOMAIN, ORGANIZATION) VALUES ($1, $2);",
@@ -56,6 +59,7 @@ domain.addSubcommand(
       } catch {
         // probably a constraint thing
       }
+    }
 
     await interaction.reply({
       content: `Added ${added} domains.`,
@@ -91,11 +95,14 @@ domain.addSubcommand(
 
     if (!(await commandIsMember(interaction, id.id))) return;
 
-    for (const domain of domains)
+    for (const domain of domains) {
+      if (!commandValidDomain(interaction, domain)) return;
+
       await db.query(
         "DELETE FROM DOMAINS WHERE ORGANIZATION = $1 AND DOMAIN = $2;",
         [id, domain]
       );
+    }
 
     await interaction.reply({
       content: `Deleted ${domains.length} domains.`,
