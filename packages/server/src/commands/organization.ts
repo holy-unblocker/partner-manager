@@ -1,6 +1,7 @@
-import { commandIsOwner, getCommandID, fetchOrgs } from "../commandUtil.js";
+import { commandIsOwner, getCommandID } from "../commandUtil.js";
 import { CommandSubOnly, registerCommand } from "../commands.js";
 import db from "../db.js";
+import { fetchOrgs } from "../util.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 import {
   SlashCommandBuilder,
