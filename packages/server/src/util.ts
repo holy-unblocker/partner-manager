@@ -1,15 +1,16 @@
 import permissions from "./config.js";
 import { PermissionType } from "./configTypes.js";
 import db from "./db.js";
-import type { APIInteractionGuildMember, GuildMember } from "discord.js";
+import type { APIInteractionGuildMember, GuildMember, User } from "discord.js";
 
 export async function testPermission(
-  member: GuildMember | APIInteractionGuildMember
+  member: GuildMember | APIInteractionGuildMember,
+  user: User
 ) {
   for (const permission of permissions)
     switch (permission.type) {
       case PermissionType.User:
-        if (permission.id === member.user.id) return true;
+        if (permission.id === user.id) return true;
         break;
       case PermissionType.Role:
         if (

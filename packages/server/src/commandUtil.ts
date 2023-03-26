@@ -68,7 +68,7 @@ export async function commandIsAuthorized(
   if (
     !interaction.member ||
     !interaction.guild ||
-    !(await testPermission(interaction.member))
+    !(await testPermission(interaction.member, interaction.user))
   ) {
     await interaction.reply({
       content: "You don't have permission to perform this operation.",
