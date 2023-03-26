@@ -3,18 +3,24 @@ import { PermissionType } from "./configTypes.js";
 import db from "./db.js";
 import type { GuildMember } from "discord.js";
 
+declare module "discord.js" {
+  interface GuildMember {
+    _roles: string[];
+  }
+}
+
 export async function testPermission(member: GuildMember) {
+  if (member.permissions.has("Administrator")) return true;
+
   for (const permission of permissions)
     switch (permission.type) {
       case PermissionType.User:
         if (permission.id === member.user.id) return true;
         break;
       case PermissionType.Role:
-        if (member.roles.cache.has(permission.id)) return true;
+        if (member._roles.includes(permission.id)) return true;
         break;
     }
-
-  // if (member.permissions.has("Administrator")) return true;
 
   return false;
 }
