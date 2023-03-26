@@ -1,4 +1,4 @@
-import "source-map-support";
+import "source-map-support/register";
 import { config } from "dotenv-flow";
 import { env } from "node:process";
 

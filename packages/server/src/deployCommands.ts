@@ -1,3 +1,4 @@
+import "./env.js";
 import "./allCommands.js";
 import { commands } from "./commands.js";
 import { DISCORD_TOKEN } from "./env.js";
