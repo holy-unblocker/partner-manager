@@ -1,24 +1,16 @@
 import permissions from "./config.js";
 import { PermissionType } from "./configTypes.js";
 import db from "./db.js";
-import type { APIInteractionGuildMember, GuildMember, User } from "discord.js";
+import type { GuildMember } from "discord.js";
 
-export async function testPermission(
-  member: GuildMember | APIInteractionGuildMember,
-  user: User
-) {
+export async function testPermission(member: GuildMember) {
   for (const permission of permissions)
     switch (permission.type) {
       case PermissionType.User:
-        if (permission.id === user.id) return true;
+        if (permission.id === member.user.id) return true;
         break;
       case PermissionType.Role:
-        if (
-          Array.isArray(member.roles)
-            ? member.roles.includes(permission.id)
-            : member.roles.cache.has(permission.id)
-        )
-          return true;
+        if (member.roles.cache.has(permission.id)) return true;
         break;
     }
 

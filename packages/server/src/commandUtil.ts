@@ -65,11 +65,10 @@ export async function commandIsMember(
 export async function commandIsAuthorized(
   interaction: ChatInputCommandInteraction
 ) {
-  if (
-    !interaction.member ||
-    !interaction.guild ||
-    !(await testPermission(interaction.member, interaction.user))
-  ) {
+  if (!interaction.guild) throw new Error("No guild");
+  const member = await interaction.guild.members.fetch(interaction.user.id);
+
+  if (!member || !(await testPermission(member))) {
     await interaction.reply({
       content: "You don't have permission to perform this operation.",
       ephemeral: true,
