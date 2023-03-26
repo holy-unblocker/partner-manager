@@ -1,7 +1,7 @@
 import { commandIsOwner, getCommandID } from "../commandUtil.js";
 import { CommandSubOnly, registerCommand } from "../commands.js";
 import db from "../db.js";
-import { fetchOrgs } from "../util.js";
+import { fetchOrgs, sanitizeOrgID, sanitizeOrgName } from "../util.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 import {
   SlashCommandBuilder,
@@ -60,8 +60,8 @@ org.addSubcommand(
     )
     .setDescription("Creates an organization"),
   async (interaction) => {
-    const vid = interaction.options.getString("id", true).trim().toLowerCase();
-    const name = interaction.options.getString("name", true);
+    const vid = sanitizeOrgID(interaction.options.getString("id", true));
+    const name = sanitizeOrgName(interaction.options.getString("name", true));
 
     const { rowCount: existingOrgs } = await db.query<{ id: string }>(
       "SELECT ID FROM ORGANIZATIONS WHERE VID = $1;",

@@ -9,6 +9,17 @@ declare module "discord.js" {
   }
 }
 
+export function sanitizeOrgName(name: string) {
+  return name.replace(/[^a-zA-Z0-9-_ ]/g, "");
+}
+
+export function sanitizeOrgID(id: string) {
+  return id
+    .replace(/[^a-zA-Z0-9-_]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 export async function testPermission(member: GuildMember) {
   for (const permission of permissions)
     switch (permission.type) {

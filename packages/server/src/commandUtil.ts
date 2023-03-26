@@ -1,5 +1,6 @@
 import {
   resolveOrg,
+  sanitizeOrgID,
   testPermission,
   userIsMember,
   userIsOwner,
@@ -22,7 +23,7 @@ export async function commandValidDomain(
 }
 
 export async function getCommandID(interaction: ChatInputCommandInteraction) {
-  const vid = interaction.options.getString("id", true).trim().toLowerCase();
+  const vid = sanitizeOrgID(interaction.options.getString("id", true));
 
   try {
     return await resolveOrg(vid);
