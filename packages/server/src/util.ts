@@ -10,8 +10,6 @@ declare module "discord.js" {
 }
 
 export async function testPermission(member: GuildMember) {
-  if (member.permissions.has("Administrator")) return true;
-
   for (const permission of permissions)
     switch (permission.type) {
       case PermissionType.User:
