@@ -1,4 +1,4 @@
-import { API_KEY, API_URL, OUTPUT_FILE } from "./env.js";
+import { API_KEY, API_URL, NGINX, OUTPUT_FILE } from "./env.js";
 import { validAddress } from "@shared-server/util";
 import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
@@ -36,23 +36,23 @@ set $PARTNER_RAMMERHEAD_DOMAINS "${domains
 
   console.log("Config created/changed.");
 
-  console.log("Restart openresty");
+  console.log("Restart NGINX");
 
-  // Execute "openresty -t" and check the exit code
+  // Execute "nginx -t" and check the exit code
   // SUCCESS = 0
   // INVALID = 1
-  const { status, error } = spawnSync("openresty -t");
+  const { status, error } = spawnSync(`${NGINX} -t`);
   switch (status) {
     case 0:
       // Restart openresty
-      spawnSync("service openresty restart");
-      console.log("Openresty restarted");
+      spawnSync(`service ${NGINX} restart`);
+      console.log("NGINX restarted");
       break;
     case null:
-      console.error(`Openresty doesn't exist on this system?`);
+      console.error(`NGINX doesn't exist on this system?`);
       console.error(error);
       return;
     default:
-      console.error(`Openresty config invalid (exit code ${status})`);
+      console.error(`NGINX config invalid (exit code ${status})`);
   }
 }

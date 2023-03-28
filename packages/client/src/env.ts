@@ -10,6 +10,12 @@ export const OUTPUT_FILE =
   env.OUTPUT_FILE || "/etc/nginx/snippets/domains.conf";
 
 /**
+ * nginx, openresty, etc
+ * name of the service and executable
+ */
+export const NGINX = env.NGINX || "nginx";
+
+/**
  * Private API key
  */
 export const API_KEY = Buffer.from(env.API_KEY || "", "base64url");
