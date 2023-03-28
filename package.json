@@ -10,7 +10,7 @@
     "watch-client": "cd packages/client && npm run watch",
     "watch-server": "cd packages/server && npm run watch",
     "watch-util": "cd packages/util && npm run watch",
-    "build": "concurrently 'npm:build-*'",
+    "build": "npm run build-util && concurrently 'npm:build-*'",
     "build-client": "cd packages/client && npm run build",
     "build-server": "cd packages/server && npm run build",
     "build-util": "cd packages/util && npm run build"
