@@ -428,4 +428,36 @@ org.addSubcommand(
   }
 );
 
+org.addSubcommand(
+  new SlashCommandSubcommandBuilder()
+    .setName("reset-api-key")
+    .addStringOption(
+      new SlashCommandStringOption()
+        .setName("id")
+        .setDescription("Short identifier for the organization")
+        .setRequired(true)
+    )
+    .setDescription("Reset the API key for an organization"),
+  async (interaction) => {
+    const id = await getCommandID(interaction);
+    if (!id) return;
+
+    // Check if the user is an owner of the organization
+    if (!(await commandIsOwner(interaction, id.id))) return;
+
+    // Reset the API key for the organization
+    const {
+      rows: [{ token }],
+    } = await db.query<{ token: string }>(
+      "UPDATE ORGANIZATIONS SET token = ENCODE(GEN_RANDOM_BYTES(32), 'hex') WHERE ID = $1 RETURNING token;",
+      [id.id]
+    );
+
+    await interaction.reply({
+      ephemeral: true,
+      content: `API Key for organization ${id.name} has been reset. New API Key: ${token}`,
+    });
+  }
+);
+
 registerCommand(org);
