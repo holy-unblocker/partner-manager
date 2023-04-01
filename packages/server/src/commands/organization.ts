@@ -1,4 +1,8 @@
-import { commandIsOwner, getCommandID } from "../commandUtil.js";
+import {
+  commandIsMember,
+  commandIsOwner,
+  getCommandID,
+} from "../commandUtil.js";
 import { CommandSubOnly, registerCommand } from "../commands.js";
 import db from "../db.js";
 import { fetchOrgs, sanitizeOrgID, sanitizeOrgName } from "../util.js";
@@ -389,6 +393,37 @@ org.addSubcommand(
     await interaction.reply({
       ephemeral: true,
       content: `You have quit the organization.`,
+    });
+  }
+);
+
+org.addSubcommand(
+  new SlashCommandSubcommandBuilder()
+    .setName("api-key")
+    .addStringOption(
+      new SlashCommandStringOption()
+        .setName("id")
+        .setDescription("Short identifier for the organization")
+        .setRequired(true)
+    )
+    .setDescription("Get the API key for an organization"),
+  async (interaction) => {
+    const id = await getCommandID(interaction);
+    if (!id) return;
+
+    if (!(await commandIsMember(interaction, id.id))) return;
+
+    // Get the API key for the organization
+    const {
+      rows: [{ token }],
+    } = await db.query<{ token: string }>(
+      "SELECT token FROM ORGANIZATIONS WHERE ID = $1;",
+      [id.id]
+    );
+
+    await interaction.reply({
+      ephemeral: true,
+      content: `API Key for organization ${id.name}: ${token}`,
     });
   }
 );
